@@ -3,9 +3,15 @@ bin-debug/
 bin-release/
 [Oo]bj/
 [Bb]in/
+bin/
+gen/
+
+# Local configuration file (sdk path, etc)
+project.properties
 
 # Other files and folders
 .settings/
+.classpath
 
 # Executables
 *.swf
