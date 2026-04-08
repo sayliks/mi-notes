@@ -22,3 +22,18 @@ project.properties
 # Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
 # should NOT be excluded as they contain compiler settings and other important
 # information for Eclipse / Flash Builder.
+
+# Android Studio / Gradle
+.gradle/
+.gradle-user-home/
+.idea/
+.vscode/
+local.properties
+
+# Build outputs
+build/
+app/build/
+*/build/
+
+# Gradle wrapper/cache distributions
+wrapper/dists/
