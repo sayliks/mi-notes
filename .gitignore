@@ -26,6 +26,7 @@ project.properties
 # Android Studio / Gradle
 .gradle/
 .gradle-user-home/
+.gradle-user-home-isolated/
 .idea/
 .vscode/
 local.properties
