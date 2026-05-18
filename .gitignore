@@ -38,3 +38,62 @@ app/build/
 
 # Gradle wrapper/cache distributions
 wrapper/dists/
+
+# Gradle
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+!gradle/wrapper/gradle-wrapper-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Logs
+*.log
+*.log.*
+
+# Backup files
+*.bak
+*.backup
+
+# Temp files
+tmp/
+temp/
+
+# Android generated
+app/release/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# ProGuard
+proguard/
+
+# Testing
+test/
+androidTest/
+
+# Local config
+local.properties
+secrets.properties
+*.env
