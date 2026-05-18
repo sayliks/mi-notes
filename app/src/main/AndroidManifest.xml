@@ -28,6 +28,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
+        android:name=".app.NotesApplication"
         android:icon="@drawable/icon_app"
         android:label="@string/app_name" >
         <activity
