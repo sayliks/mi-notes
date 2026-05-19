@@ -41,8 +41,9 @@ wrapper/dists/
 
 # Gradle
 gradle/wrapper/gradle-wrapper.jar
-gradle/wrapper/gradle-wrapper.properties
-!gradle/wrapper/gradle-wrapper-wrapper.jar
+
+# Claude Code
+.claude/
 
 # IDE
 .idea/
@@ -75,6 +76,7 @@ Desktop.ini
 # Temp files
 tmp/
 temp/
+nul
 
 # Android generated
 app/release/
