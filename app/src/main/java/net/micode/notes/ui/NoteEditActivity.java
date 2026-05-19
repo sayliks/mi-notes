@@ -16,9 +16,9 @@
 
 package net.micode.notes.ui;
 
-import android.app.Activity;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import android.app.AlarmManager;
-import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.app.SearchManager;
 import android.appwidget.AppWidgetManager;
@@ -72,7 +72,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class NoteEditActivity extends Activity implements OnClickListener,
+public class NoteEditActivity extends AppCompatActivity implements OnClickListener,
         NoteSettingChangedListener, OnTextViewChangeListener {
     private class HeadViewHolder {
         public TextView tvModified;
@@ -546,8 +546,9 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     private void setReminder() {
         DateTimePickerDialog d = new DateTimePickerDialog(this, System.currentTimeMillis());
         d.setOnDateTimeSetListener(new OnDateTimeSetListener() {
+            @Override
             public void OnDateTimeSet(AlertDialog dialog, long date) {
-                mWorkingNote.setAlertDate(date	, true);
+                mWorkingNote.setAlertDate(date, true);
             }
         });
         d.show();

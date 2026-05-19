@@ -57,7 +57,7 @@
         android:contentDescription="@string/notelist_menu_new"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
+        android:src="@drawable/new_note_normal"
         app:backgroundTint="@color/colorPrimary"
-        app:srcCompat="@android:drawable/ic_input_add"
         app:tint="@color/colorOnPrimary" />
 </FrameLayout>
