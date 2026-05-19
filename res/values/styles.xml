@@ -58,7 +58,7 @@
         <item name="android:textColor">@color/secondary_text_dark</item>
     </style>
 
-    <style name="NoteTheme" parent="Theme.MaterialComponents.Light.NoActionBar.Bridge">
+    <style name="NoteTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
         <item name="colorOnPrimary">@color/colorOnPrimary</item>

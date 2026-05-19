@@ -12,8 +12,13 @@ public class NotesApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Initialize Room database singleton
-        database = NotesDatabase.getInstance(this);
+        try {
+            // Initialize Room database singleton
+            database = NotesDatabase.getInstance(this);
+        } catch (Exception e) {
+            android.util.Log.e("NotesApplication", "Database init failed", e);
+            throw e;
+        }
     }
 
     public static NotesDatabase getDatabase() {

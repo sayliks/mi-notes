@@ -16,8 +16,9 @@
 
 package net.micode.notes.ui;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.appwidget.AppWidgetManager;
 import android.content.AsyncQueryHandler;
@@ -75,7 +76,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashSet;
 
-public class NotesListActivity extends Activity implements OnClickListener, OnItemLongClickListener {
+public class NotesListActivity extends AppCompatActivity implements OnClickListener, OnItemLongClickListener {
     private static final int FOLDER_NOTE_LIST_QUERY_TOKEN = 0;
 
     private static final int FOLDER_LIST_QUERY_TOKEN      = 1;
@@ -129,13 +130,19 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.note_list);
-        initResources();
+        try {
+            setContentView(R.layout.note_list);
+            initResources();
 
-        /**
-         * Insert an introduction when user firstly use this application
-         */
-        setAppInfoFromRawRes();
+            /**
+             * Insert an introduction when user firstly use this application
+             */
+            setAppInfoFromRawRes();
+        } catch (Exception e) {
+            Log.e(TAG, "onCreate failed", e);
+            android.widget.Toast.makeText(this, "Crash: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            throw e;
+        }
     }
 
     @Override

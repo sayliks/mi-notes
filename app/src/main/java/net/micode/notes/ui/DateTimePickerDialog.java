@@ -22,7 +22,7 @@ import net.micode.notes.R;
 import net.micode.notes.ui.DateTimePicker;
 import net.micode.notes.ui.DateTimePicker.OnDateTimeChangedListener;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
@@ -58,8 +58,8 @@ public class DateTimePickerDialog extends AlertDialog implements OnClickListener
         mDate.setTimeInMillis(date);
         mDate.set(Calendar.SECOND, 0);
         mDateTimePicker.setCurrentDate(mDate.getTimeInMillis());
-        setButton(context.getString(R.string.datetime_dialog_ok), this);
-        setButton2(context.getString(R.string.datetime_dialog_cancel), (OnClickListener)null);
+        setButton(BUTTON_POSITIVE, context.getString(R.string.datetime_dialog_ok), this);
+        setButton(BUTTON_NEGATIVE, context.getString(R.string.datetime_dialog_cancel), (OnClickListener)null);
         set24HourView(DateFormat.is24HourFormat(this.getContext()));
         updateTitle(mDate.getTimeInMillis());
     }

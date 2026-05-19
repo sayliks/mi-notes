@@ -3,13 +3,16 @@ package net.micode.notes.data.entity;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
-import androidx.room.PrimaryKey;
+import androidx.room.Index;
 
 /**
  * Cross-reference entity for note-tag many-to-many relationship.
  */
 @Entity(tableName = "note_tag",
         primaryKeys = {"note_id", "tag_id"},
+        indices = {
+                @Index(value = "tag_id")
+        },
         foreignKeys = {
                 @ForeignKey(entity = NoteEntity.class, parentColumns = "id",
                         childColumns = "note_id", onDelete = ForeignKey.CASCADE),
