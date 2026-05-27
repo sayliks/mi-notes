@@ -347,7 +347,7 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         }
 
         int bgId = mRoomNote.bgColorId;
-        if (bgId < 0 || bgId >= ResourceParser.NoteBgResources.getNoteBgResource(0)) {
+        if (bgId < 0 || bgId > ResourceParser.RED) {
             bgId = ResourceParser.YELLOW;
         }
         mHeadViewPanel.setBackgroundResource(ResourceParser.NoteBgResources.getNoteTitleBgResource(bgId));

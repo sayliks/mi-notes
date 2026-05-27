@@ -31,6 +31,7 @@ public abstract class NotesDatabase extends RoomDatabase {
         if (INSTANCE == null) {
             INSTANCE = Room.databaseBuilder(context, NotesDatabase.class, "notes.db")
                     .addMigrations(MIGRATION_1_2)
+                    .allowMainThreadQueries()
                     .build();
         }
         return INSTANCE;
