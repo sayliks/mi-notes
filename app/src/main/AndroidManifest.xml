@@ -130,14 +130,14 @@
             android:name=".ui.AlarmAlertActivity"
             android:label="@string/app_name"
             android:launchMode="singleInstance"
-            android:theme="@android:style/Theme.Holo.Wallpaper.NoTitleBar" >
+            android:theme="@style/NoteTheme" >
         </activity>
 
         <activity
             android:name="net.micode.notes.ui.NotesPreferenceActivity"
             android:label="@string/preferences_title"
             android:launchMode="singleTop"
-            android:theme="@android:style/Theme.Holo.Light" >
+            android:theme="@style/NoteTheme" >
         </activity>
 
         <service
