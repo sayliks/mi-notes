@@ -128,7 +128,7 @@
             android:name=".ui.AlarmAlertActivity"
             android:label="@string/app_name"
             android:launchMode="singleInstance"
-            android:theme="@android:style/Theme.Holo.Wallpaper.NoTitleBar" >
+            android:theme="@style/NoteTheme" >
         </activity>
 
         <activity
