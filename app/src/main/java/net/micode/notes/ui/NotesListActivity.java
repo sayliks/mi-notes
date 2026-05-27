@@ -219,6 +219,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                 null, false);
         mNotesListView.setOnItemClickListener(new OnListItemClickListener());
         mNotesListView.setOnItemLongClickListener(this);
+        registerForContextMenu(mNotesListView);
         mNotesListAdapter = new NotesListAdapter(this);
         mNotesListView.setAdapter(mNotesListAdapter);
         mAddNewNote = findViewById(R.id.btn_new_note);
@@ -640,7 +641,9 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
     private final OnCreateContextMenuListener mFolderOnCreateContextMenuListener = new OnCreateContextMenuListener() {
         public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-            if (mFocusNoteDataItem != null) {
+            if (mFocusNoteDataItem != null
+                    && (mFocusNoteDataItem.getType() == Notes.TYPE_FOLDER
+                    || mFocusNoteDataItem.getType() == Notes.TYPE_SYSTEM)) {
                 menu.setHeaderTitle(mFocusNoteDataItem.getSnippet());
                 menu.add(0, MENU_FOLDER_VIEW, 0, R.string.menu_folder_view);
                 menu.add(0, MENU_FOLDER_DELETE, 0, R.string.menu_folder_delete);
@@ -651,9 +654,6 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
     @Override
     public void onContextMenuClosed(Menu menu) {
-        if (mNotesListView != null) {
-            mNotesListView.setOnCreateContextMenuListener(null);
-        }
         super.onContextMenuClosed(menu);
     }
 
@@ -864,7 +864,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                     Log.e(TAG, "startActionMode fails");
                 }
             } else if (mFocusNoteDataItem.getType() == Notes.TYPE_FOLDER) {
-                mNotesListView.setOnCreateContextMenuListener(mFolderOnCreateContextMenuListener);
+                mNotesListView.showContextMenu();
             }
         }
         return false;
