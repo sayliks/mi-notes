@@ -9,6 +9,9 @@ import androidx.room.PrimaryKey;
  */
 @Entity(tableName = "note")
 public class NoteEntity {
+    public static final int CONTENT_TYPE_TEXT = 0;
+    public static final int CONTENT_TYPE_MARKDOWN = 1;
+
     @PrimaryKey(autoGenerate = true)
     public long id;
 

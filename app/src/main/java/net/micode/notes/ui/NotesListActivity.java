@@ -32,6 +32,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -399,6 +401,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         Intent intent = new Intent(this, NoteEditActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
         intent.putExtra(Intent.EXTRA_UID, note.id);
+        intent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, note.id);
         this.startActivityForResult(intent, REQUEST_CODE_OPEN_NODE);
     }
 
@@ -423,10 +426,27 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     }
 
     private void createNewNote() {
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        View sheet = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_new_note, null);
+        sheet.findViewById(R.id.btn_text_note).setOnClickListener(v -> {
+            dialog.dismiss();
+            openNewRoomNote(false);
+        });
+        sheet.findViewById(R.id.btn_checklist).setOnClickListener(v -> {
+            dialog.dismiss();
+            openNewRoomNote(true);
+        });
+        dialog.setContentView(sheet);
+        dialog.show();
+    }
+
+    private void openNewRoomNote(boolean isChecklist) {
+        long noteId = mViewModel.createNote(NoteEntity.CONTENT_TYPE_TEXT, isChecklist);
         Intent intent = new Intent(this, NoteEditActivity.class);
-        intent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-        intent.putExtra(Notes.INTENT_EXTRA_FOLDER_ID, mViewModel.getCurrentFolderId());
-        this.startActivityForResult(intent, REQUEST_CODE_NEW_NODE);
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.putExtra(Intent.EXTRA_UID, noteId);
+        intent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, noteId);
+        startActivityForResult(intent, REQUEST_CODE_NEW_NODE);
     }
 
     private void showSoftInput() {

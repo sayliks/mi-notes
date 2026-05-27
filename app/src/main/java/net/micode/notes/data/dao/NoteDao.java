@@ -45,6 +45,10 @@ public interface NoteDao {
     @Query("SELECT * FROM note WHERE id = :id")
     LiveData<NoteEntity> getNoteById(long id);
 
+    // 同步获取单个便签（供编辑页加载）
+    @Query("SELECT * FROM note WHERE id = :id")
+    NoteEntity getNoteByIdSync(long id);
+
     // 软删除
     @Query("UPDATE note SET is_deleted = 1, modified_date = :deleteTime WHERE id = :noteId")
     void markAsDeleted(long noteId, long deleteTime);

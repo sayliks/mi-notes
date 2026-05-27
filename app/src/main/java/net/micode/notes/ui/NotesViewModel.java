@@ -12,6 +12,7 @@ import net.micode.notes.data.Notes;
 import net.micode.notes.data.dao.NoteDao;
 import net.micode.notes.data.database.NotesDatabase;
 import net.micode.notes.data.entity.NoteEntity;
+import net.micode.notes.tool.ResourceParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,5 +75,24 @@ public class NotesViewModel extends AndroidViewModel {
                 noteDao.deleteFolderById(folderId);
             }
         }).start();
+    }
+
+    public long createNote(int contentType, boolean isChecklist) {
+        NoteEntity note = new NoteEntity();
+        note.title = "";
+        note.content = "";
+        note.contentType = contentType;
+        note.isChecklist = isChecklist;
+        note.type = Notes.TYPE_NOTE;
+        note.parentId = getCurrentFolderId();
+        note.createdDate = System.currentTimeMillis();
+        note.modifiedDate = note.createdDate;
+        note.bgColorId = ResourceParser.getDefaultBgId(getApplication());
+        note.isDeleted = false;
+        return noteDao.insert(note);
+    }
+
+    public NoteDao getNoteDao() {
+        return noteDao;
     }
 }
