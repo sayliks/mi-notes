@@ -18,8 +18,6 @@ package net.micode.notes.ui;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
-import android.app.ActionBar;
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -28,19 +26,22 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.Preference.OnPreferenceClickListener;
-import android.preference.PreferenceActivity;
-import android.preference.PreferenceCategory;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.preference.CheckBoxPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceCategory;
+import androidx.preference.PreferenceFragmentCompat;
 
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
@@ -48,7 +49,7 @@ import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.gtask.remote.GTaskSyncService;
 
 
-public class NotesPreferenceActivity extends PreferenceActivity {
+public class NotesPreferenceActivity extends AppCompatActivity {
     public static final String PREFERENCE_NAME = "notes_preferences";
 
     public static final String PREFERENCE_SYNC_ACCOUNT_NAME = "pref_key_account_name";
@@ -61,8 +62,6 @@ public class NotesPreferenceActivity extends PreferenceActivity {
 
     private static final String AUTHORITIES_FILTER_KEY = "authorities";
 
-    private PreferenceCategory mAccountCategory;
-
     private GTaskReceiver mReceiver;
 
     private Account[] mOriAccounts;
@@ -72,20 +71,26 @@ public class NotesPreferenceActivity extends PreferenceActivity {
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        setContentView(R.layout.activity_preferences);
 
-        /* using the app icon for navigation */
-        getActionBar().setDisplayHomeAsUpEnabled(true);
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
-        addPreferencesFromResource(R.xml.preferences);
-        mAccountCategory = (PreferenceCategory) findPreference(PREFERENCE_SYNC_ACCOUNT_KEY);
+        if (icicle == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.prefs_container, new NotesPreferenceFragment())
+                    .commit();
+        }
+
         mReceiver = new GTaskReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction(GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME);
         registerReceiver(mReceiver, filter);
 
         mOriAccounts = null;
-        View header = LayoutInflater.from(this).inflate(R.layout.settings_header, null);
-        getListView().addHeaderView(header, null, true);
     }
 
     @Override
@@ -124,14 +129,25 @@ public class NotesPreferenceActivity extends PreferenceActivity {
         super.onDestroy();
     }
 
+    private PreferenceFragmentCompat getPreferenceFragment() {
+        return (PreferenceFragmentCompat) getSupportFragmentManager()
+                .findFragmentById(R.id.prefs_container);
+    }
+
     private void loadAccountPreference() {
-        mAccountCategory.removeAll();
+        PreferenceFragmentCompat fragment = getPreferenceFragment();
+        if (fragment == null) return;
+
+        PreferenceCategory accountCategory = fragment.findPreference(PREFERENCE_SYNC_ACCOUNT_KEY);
+        if (accountCategory == null) return;
+
+        accountCategory.removeAll();
 
         Preference accountPref = new Preference(this);
         final String defaultAccount = getSyncAccountName(this);
         accountPref.setTitle(getString(R.string.preferences_account_title));
         accountPref.setSummary(getString(R.string.preferences_account_summary));
-        accountPref.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+        accountPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             public boolean onPreferenceClick(Preference preference) {
                 if (!GTaskSyncService.isSyncing()) {
                     if (TextUtils.isEmpty(defaultAccount)) {
@@ -151,7 +167,7 @@ public class NotesPreferenceActivity extends PreferenceActivity {
             }
         });
 
-        mAccountCategory.addPreference(accountPref);
+        accountCategory.addPreference(accountPref);
     }
 
     private void loadSyncButton() {
@@ -360,6 +376,24 @@ public class NotesPreferenceActivity extends PreferenceActivity {
         return settings.getLong(PREFERENCE_LAST_SYNC_TIME, 0);
     }
 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            Intent intent = new Intent(this, NotesListActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    public static class NotesPreferenceFragment extends PreferenceFragmentCompat {
+        @Override
+        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+            setPreferencesFromResource(R.xml.preferences, rootKey);
+        }
+    }
+
     private class GTaskReceiver extends BroadcastReceiver {
 
         @Override
@@ -371,18 +405,6 @@ public class NotesPreferenceActivity extends PreferenceActivity {
                         .getStringExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_PROGRESS_MSG));
             }
 
-        }
-    }
-
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                Intent intent = new Intent(this, NotesListActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(intent);
-                return true;
-            default:
-                return false;
         }
     }
 }
