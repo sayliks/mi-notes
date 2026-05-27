@@ -1,23 +1,33 @@
-[中文]
+# MiNotes
 
-1. MiCode便签是小米便签的社区开源版，由MIUI团队(www.miui.com) 发起并贡献第一批代码，遵循NOTICE文件所描述的开源协议，
-   今后为MiCode社区(www.micode.net) 拥有，并由社区发布和维护。
+小米便签社区开源版，一个简洁的 Android 笔记应用。
 
-2. Bug反馈和跟踪，请访问Github,
-   https://github.com/MiCode/Notes/issues?sort=created&direction=desc&state=open
+## 功能
 
-3. 功能建议和综合讨论，请访问MiCode,
-   http://micode.net/forum.php?mod=forumdisplay&fid=38
+- 创建、编辑、删除便签
+- 文件夹分类管理
+- 清单（勾选）模式
+- 五种背景颜色主题
+- 便签提醒
+- 桌面小部件（2x2 / 4x4）
+- 导出为文本
+- Google Tasks 同步
 
+## 构建
 
-[English]
+```bash
+./gradlew assembleDebug
+```
 
-1. MiCode Notes is open source edition of XM notepad, it's first initiated and sponsored by MIUI team (www.miui.com).
-   It's opened under license described by NOTICE file. It's owned by the MiCode community (www.micode.net). In future,
-   the MiCode community will release and maintain this project.
+生成的 APK 位于 `app/build/outputs/apk/debug/`。
 
-2. Regarding issue tracking, please visit Github,
-   https://github.com/MiCode/Notes/issues?sort=created&direction=desc&state=open
+## 技术栈
 
-3. Regarding feature request and general discussion, please visit Micode forum,
-   http://micode.net/forum.php?mod=forumdisplay&fid=38
+- Android SDK 36，minSdk 21
+- Java 8 + Kotlin
+- ContentProvider + SQLite
+- Material Components
+
+## 开源协议
+
+Apache License 2.0，详见 [LICENSE](NOTICE)。
