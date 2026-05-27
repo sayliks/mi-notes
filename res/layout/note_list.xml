@@ -27,6 +27,14 @@
         android:layout_height="fill_parent"
         android:orientation="vertical">
 
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/colorPrimary"
+            app:titleTextColor="@color/colorOnPrimary"
+            app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
+
         <TextView
             android:id="@+id/tv_title_bar"
             android:layout_width="fill_parent"

@@ -18,6 +18,7 @@ package net.micode.notes.ui;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.SearchManager;
@@ -364,6 +365,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     }
 
     private void initResources() {
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
         mHeadViewPanel = findViewById(R.id.note_title);
         mNoteHeaderHolder = new HeadViewHolder();
         mNoteHeaderHolder.tvModified = (TextView) findViewById(R.id.tv_modified_date);
@@ -508,7 +514,10 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
-        if (itemId == R.id.menu_new_note) {
+        if (itemId == android.R.id.home) {
+            finish();
+            return true;
+        } else if (itemId == R.id.menu_new_note) {
             createNewNote();
         } else if (itemId == R.id.menu_delete) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
