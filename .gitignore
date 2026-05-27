@@ -1,49 +1,10 @@
-# Build and Release Folders
-bin-debug/
-bin-release/
-[Oo]bj/
-[Bb]in/
-bin/
-gen/
-
-# Local configuration file (sdk path, etc)
-project.properties
-
-# Other files and folders
-.settings/
-.classpath
-
-# Executables
-*.swf
-*.air
-*.ipa
-*.apk
-
-# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
-# should NOT be excluded as they contain compiler settings and other important
-# information for Eclipse / Flash Builder.
-
-# Android Studio / Gradle
+# Gradle
 .gradle/
 .gradle-user-home/
 .gradle-user-home-isolated/
-.idea/
-.vscode/
-local.properties
-
-# Build outputs
 build/
-app/build/
 */build/
-
-# Gradle wrapper/cache distributions
 wrapper/dists/
-
-# Gradle
-gradle/wrapper/gradle-wrapper.jar
-
-# Claude Code
-.claude/
 
 # IDE
 .idea/
@@ -52,6 +13,25 @@ gradle/wrapper/gradle-wrapper.jar
 *.swp
 *.swo
 *~
+
+# Claude Code
+.claude/
+
+# Local configuration
+local.properties
+secrets.properties
+*.env
+
+# Android generated
+app/release/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.jks
+*.keystore
+proguard/
 
 # OS
 .DS_Store
@@ -78,24 +58,16 @@ tmp/
 temp/
 nul
 
-# Android generated
-app/release/
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-*.aab
-*.jks
-*.keystore
-
-# ProGuard
-proguard/
-
-# Testing
-test/
-androidTest/
-
-# Local config
-local.properties
-secrets.properties
-*.env
+# Legacy (Flash/Eclipse)
+bin-debug/
+bin-release/
+[Oo]bj/
+[Bb]in/
+bin/
+gen/
+.settings/
+.classpath
+project.properties
+*.swf
+*.air
+*.ipa
