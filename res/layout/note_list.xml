@@ -46,15 +46,13 @@
             android:textColor="#FFEAD1AE"
             android:textSize="@dimen/text_font_size_medium" />
 
-        <ListView
-            android:id="@+id/notes_list"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view"
             android:layout_width="fill_parent"
             android:layout_height="0dip"
             android:layout_weight="1"
-            android:cacheColorHint="@null"
-            android:listSelector="@android:color/transparent"
-            android:divider="@null"
-            android:fadingEdge="@null" />
+            android:clipToPadding="false"
+            android:paddingBottom="72dp" />
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton

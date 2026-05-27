@@ -44,4 +44,10 @@ public class NoteEntity {
 
     @ColumnInfo(name = "version")
     public int version;
+
+    @ColumnInfo(name = "type")
+    public int type;               // 0=NOTE, 1=FOLDER, 2=SYSTEM
+
+    @ColumnInfo(name = "notes_count")
+    public int notesCount;         // 文件夹内便签数
 }
