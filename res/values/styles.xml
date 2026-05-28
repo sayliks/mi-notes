@@ -70,10 +70,11 @@
         <item name="android:colorBackground">@color/colorBackground</item>
         <item name="android:statusBarColor">@color/colorPrimaryVariant</item>
         <item name="android:navigationBarColor">@color/colorSurface</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
     </style>
 
-    <style name="NoteActionBarStyle" parent="@android:style/Widget.Holo.Light.ActionBar.Solid">
-        <item name="android:displayOptions" />
+    <style name="NoteActionBarStyle" parent="Widget.AppCompat.Light.ActionBar.Solid">
+        <item name="displayOptions" />
         <item name="android:visibility">gone</item>
     </style>
 </resources>
