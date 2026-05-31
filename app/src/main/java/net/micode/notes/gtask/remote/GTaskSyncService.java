@@ -22,8 +22,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 
 public class GTaskSyncService extends Service {
+    private static final String TAG = GTaskSyncService.class.getSimpleName();
+
     public final static String ACTION_STRING_NAME = "sync_action_type";
 
     public final static int ACTION_START_SYNC = 0;
@@ -69,6 +72,10 @@ public class GTaskSyncService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) {
+            return START_NOT_STICKY;
+        }
+
         Bundle bundle = intent.getExtras();
         if (bundle != null && bundle.containsKey(ACTION_STRING_NAME)) {
             switch (bundle.getInt(ACTION_STRING_NAME, ACTION_INVALID)) {
@@ -81,9 +88,8 @@ public class GTaskSyncService extends Service {
                 default:
                     break;
             }
-            return START_STICKY;
         }
-        return super.onStartCommand(intent, flags, startId);
+        return START_NOT_STICKY;
     }
 
     @Override
@@ -100,6 +106,7 @@ public class GTaskSyncService extends Service {
     public void sendBroadcast(String msg) {
         mSyncProgress = msg;
         Intent intent = new Intent(GTASK_SERVICE_BROADCAST_NAME);
+        intent.setPackage(getPackageName());
         intent.putExtra(GTASK_SERVICE_BROADCAST_IS_SYNCING, mSyncTask != null);
         intent.putExtra(GTASK_SERVICE_BROADCAST_PROGRESS_MSG, msg);
         sendBroadcast(intent);
@@ -109,13 +116,21 @@ public class GTaskSyncService extends Service {
         GTaskManager.getInstance().setActivityContext(activity);
         Intent intent = new Intent(activity, GTaskSyncService.class);
         intent.putExtra(GTaskSyncService.ACTION_STRING_NAME, GTaskSyncService.ACTION_START_SYNC);
-        activity.startService(intent);
+        try {
+            activity.startService(intent);
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Unable to start sync service", e);
+        }
     }
 
     public static void cancelSync(Context context) {
         Intent intent = new Intent(context, GTaskSyncService.class);
         intent.putExtra(GTaskSyncService.ACTION_STRING_NAME, GTaskSyncService.ACTION_CANCEL_SYNC);
-        context.startService(intent);
+        try {
+            context.startService(intent);
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Unable to cancel sync service", e);
+        }
     }
 
     public static boolean isSyncing() {
