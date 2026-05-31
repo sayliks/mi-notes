@@ -110,6 +110,11 @@ public class GTaskClient {
     }
 
     public boolean login(Activity activity) {
+        if (activity == null) {
+            Log.e(TAG, "activity context is null");
+            return false;
+        }
+
         // we suppose that the cookie would expire after 5 minutes
         // then we need to re-login
         final long interval = 1000 * 60 * 5;
@@ -118,9 +123,10 @@ public class GTaskClient {
         }
 
         // need to re-login after account switch
+        Account syncAccount = getSyncAccount();
         if (mLoggedin
-                && !TextUtils.equals(getSyncAccount().name, NotesPreferenceActivity
-                        .getSyncAccountName(activity))) {
+                && (syncAccount == null || !TextUtils.equals(syncAccount.name,
+                        NotesPreferenceActivity.getSyncAccountName(activity)))) {
             mLoggedin = false;
         }
 
@@ -167,7 +173,13 @@ public class GTaskClient {
     private String loginGoogleAccount(Activity activity, boolean invalidateToken) {
         String authToken;
         AccountManager accountManager = AccountManager.get(activity);
-        Account[] accounts = accountManager.getAccountsByType("com.google");
+        Account[] accounts;
+        try {
+            accounts = accountManager.getAccountsByType("com.google");
+        } catch (SecurityException e) {
+            Log.e(TAG, "get google accounts failed", e);
+            return null;
+        }
 
         if (accounts.length == 0) {
             Log.e(TAG, "there is no available google account");
@@ -190,8 +202,14 @@ public class GTaskClient {
         }
 
         // get the token now
-        AccountManagerFuture<Bundle> accountManagerFuture = accountManager.getAuthToken(account,
-                "goanna_mobile", null, activity, null, null);
+        AccountManagerFuture<Bundle> accountManagerFuture;
+        try {
+            accountManagerFuture = accountManager.getAuthToken(account,
+                    "goanna_mobile", null, activity, null, null);
+        } catch (SecurityException e) {
+            Log.e(TAG, "get auth token failed", e);
+            return null;
+        }
         try {
             Bundle authTokenBundle = accountManagerFuture.getResult();
             authToken = authTokenBundle.getString(AccountManager.KEY_AUTHTOKEN);

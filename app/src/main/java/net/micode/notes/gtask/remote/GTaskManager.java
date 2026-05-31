@@ -17,6 +17,7 @@
 package net.micode.notes.gtask.remote;
 
 import android.app.Activity;
+import android.accounts.Account;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -791,7 +792,8 @@ public class GTaskManager {
     }
 
     public String getSyncAccount() {
-        return GTaskClient.getInstance().getSyncAccount().name;
+        Account account = GTaskClient.getInstance().getSyncAccount();
+        return account == null ? "" : account.name;
     }
 
     public void cancelSync() {

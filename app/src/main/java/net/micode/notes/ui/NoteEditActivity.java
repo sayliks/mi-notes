@@ -29,6 +29,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Paint;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.Spannable;
@@ -623,7 +624,12 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         if (mWorkingNote.getNoteId() > 0) {
             Intent intent = new Intent(this, AlarmReceiver.class);
             intent.setData(ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, mWorkingNote.getNoteId()));
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
+            int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent,
+                    pendingIntentFlags);
             AlarmManager alarmManager = ((AlarmManager) getSystemService(ALARM_SERVICE));
             showAlertHeader();
             if(!set) {

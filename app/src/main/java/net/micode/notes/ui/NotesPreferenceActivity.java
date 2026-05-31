@@ -28,6 +28,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -38,6 +39,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 import androidx.preference.CheckBoxPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -50,6 +52,8 @@ import net.micode.notes.gtask.remote.GTaskSyncService;
 
 
 public class NotesPreferenceActivity extends AppCompatActivity {
+    private static final String TAG = NotesPreferenceActivity.class.getSimpleName();
+
     public static final String PREFERENCE_NAME = "notes_preferences";
 
     public static final String PREFERENCE_SYNC_ACCOUNT_NAME = "pref_key_account_name";
@@ -63,6 +67,8 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     private static final String AUTHORITIES_FILTER_KEY = "authorities";
 
     private GTaskReceiver mReceiver;
+
+    private boolean mReceiverRegistered;
 
     private Account[] mOriAccounts;
 
@@ -88,7 +94,9 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         mReceiver = new GTaskReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction(GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME);
-        registerReceiver(mReceiver, filter);
+        ContextCompat.registerReceiver(this, mReceiver, filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        mReceiverRegistered = true;
 
         mOriAccounts = null;
     }
@@ -123,8 +131,9 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        if (mReceiver != null) {
+        if (mReceiverRegistered && mReceiver != null) {
             unregisterReceiver(mReceiver);
+            mReceiverRegistered = false;
         }
         super.onDestroy();
     }
@@ -264,7 +273,11 @@ public class NotesPreferenceActivity extends AppCompatActivity {
                 intent.putExtra(AUTHORITIES_FILTER_KEY, new String[] {
                     "gmail-ls"
                 });
-                startActivityForResult(intent, -1);
+                try {
+                    startActivityForResult(intent, -1);
+                } catch (Exception e) {
+                    Log.w(TAG, "Unable to open add-account settings", e);
+                }
                 dialog.dismiss();
             }
         });
@@ -301,7 +314,12 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
     private Account[] getGoogleAccounts() {
         AccountManager accountManager = AccountManager.get(this);
-        return accountManager.getAccountsByType("com.google");
+        try {
+            return accountManager.getAccountsByType("com.google");
+        } catch (SecurityException e) {
+            Log.w(TAG, "Unable to read Google accounts", e);
+            return new Account[0];
+        }
     }
 
     private void setSyncAccount(String account) {

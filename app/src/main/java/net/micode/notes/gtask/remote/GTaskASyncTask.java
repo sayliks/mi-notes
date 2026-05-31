@@ -17,14 +17,17 @@
 
 package net.micode.notes.gtask.remote;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Build;
+import android.util.Log;
 
 import net.micode.notes.R;
 import net.micode.notes.ui.NotesListActivity;
@@ -32,6 +35,8 @@ import net.micode.notes.ui.NotesPreferenceActivity;
 
 
 public class GTaskASyncTask extends AsyncTask<Void, String, Integer> {
+
+    private static final String TAG = GTaskASyncTask.class.getSimpleName();
 
     private static int GTASK_SYNC_NOTIFICATION_ID = 5234235;
     private static final String GTASK_SYNC_CHANNEL_ID = "gtask_sync";
@@ -67,6 +72,10 @@ public class GTaskASyncTask extends AsyncTask<Void, String, Integer> {
     }
 
     private void showNotification(int tickerId, String content) {
+        if (mNotifiManager == null || !canPostNotifications()) {
+            return;
+        }
+
         ensureNotificationChannel();
         PendingIntent pendingIntent;
         int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -99,7 +108,17 @@ public class GTaskASyncTask extends AsyncTask<Void, String, Integer> {
                 .setDefaults(Notification.DEFAULT_LIGHTS)
                 .setContentIntent(pendingIntent)
                 .build();
-        mNotifiManager.notify(GTASK_SYNC_NOTIFICATION_ID, notification);
+        try {
+            mNotifiManager.notify(GTASK_SYNC_NOTIFICATION_ID, notification);
+        } catch (SecurityException e) {
+            Log.w(TAG, "Unable to post sync notification", e);
+        }
+    }
+
+    private boolean canPostNotifications() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || mContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void ensureNotificationChannel() {
