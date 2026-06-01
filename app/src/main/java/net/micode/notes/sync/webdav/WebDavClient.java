@@ -25,6 +25,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -158,40 +160,153 @@ class WebDavClient {
     }
 
     private URL getSnapshotUrl() throws IOException {
-        String trimmedUrl = mUrl == null ? "" : mUrl.trim();
+        return resolveSnapshotUrl(mUrl);
+    }
+
+    private URL getBackupUrl(long timestamp) throws IOException {
+        return resolveBackupUrl(mUrl, timestamp);
+    }
+
+    static URL resolveSnapshotUrl(String url) throws IOException {
+        URI uri = parseWebDavUri(url);
+        if (isDirectJsonUrl(uri)) {
+            return toUrl(uri);
+        }
+        return toUrl(rebuildUri(uri, appendPathSegment(uri.getRawPath(), SNAPSHOT_FILE_NAME)));
+    }
+
+    static URL resolveBackupUrl(String url, long timestamp) throws IOException {
+        URI uri = parseWebDavUri(url);
+        String backupSuffix = ".backup-" + timestamp + ".json";
+        if (isDirectJsonUrl(uri)) {
+            String rawPath = getRawPath(uri);
+            int slashIndex = rawPath.lastIndexOf('/');
+            String parent = slashIndex >= 0 ? rawPath.substring(0, slashIndex + 1) : "/";
+            String fileName = slashIndex >= 0 ? rawPath.substring(slashIndex + 1) : rawPath;
+            String backupFileName = fileName.substring(0, fileName.length() - 5) + backupSuffix;
+            return toUrl(rebuildUri(uri, parent + backupFileName));
+        }
+        return toUrl(rebuildUri(uri, appendPathSegment(uri.getRawPath(),
+                SNAPSHOT_FILE_NAME.substring(0, SNAPSHOT_FILE_NAME.length() - 5)
+                        + backupSuffix)));
+    }
+
+    static boolean hrefMatchesUrl(String href, URL expectedUrl) throws IOException {
+        return normalizeHrefPath(href).equals(normalizeHrefPath(expectedUrl.toExternalForm()));
+    }
+
+    static String normalizeHrefPath(String href) throws IOException {
         try {
-            if (trimmedUrl.toLowerCase(Locale.US).endsWith(".json")) {
-                return new URL(trimmedUrl);
+            URI uri = new URI(href == null ? "" : href.trim()).normalize();
+            String rawPath = uri.getRawPath();
+            return decodePercentEncoded(rawPath == null ? "" : rawPath);
+        } catch (URISyntaxException e) {
+            throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV href");
+        }
+    }
+
+    private static URI parseWebDavUri(String url) throws IOException {
+        String trimmedUrl = url == null ? "" : url.trim();
+        try {
+            URI uri = new URI(trimmedUrl);
+            if (uri.getScheme() == null || uri.getRawAuthority() == null) {
+                throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
             }
-            if (!trimmedUrl.endsWith("/")) {
-                trimmedUrl += "/";
+            if (!"http".equalsIgnoreCase(uri.getScheme())
+                    && !"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new WebDavException(ERROR_INVALID_URL,
+                        "Unsupported WebDAV URL scheme: " + uri.getScheme());
             }
-            return new URL(trimmedUrl + SNAPSHOT_FILE_NAME);
+            return uri;
+        } catch (URISyntaxException e) {
+            throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
+        }
+    }
+
+    private static URL toUrl(URI uri) throws IOException {
+        try {
+            return new URL(uri.toASCIIString());
         } catch (MalformedURLException e) {
             throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
         }
     }
 
-    private URL getBackupUrl(long timestamp) throws IOException {
-        String trimmedUrl = mUrl == null ? "" : mUrl.trim();
-        String backupSuffix = ".backup-" + timestamp + ".json";
+    private static boolean isDirectJsonUrl(URI uri) {
+        return getRawPath(uri).toLowerCase(Locale.US).endsWith(".json");
+    }
+
+    private static String appendPathSegment(String rawPath, String segment) {
+        String basePath = rawPath == null || rawPath.length() == 0 ? "/" : rawPath;
+        if (!basePath.endsWith("/")) {
+            basePath += "/";
+        }
+        return basePath + segment;
+    }
+
+    private static String getRawPath(URI uri) {
+        String rawPath = uri.getRawPath();
+        return rawPath == null || rawPath.length() == 0 ? "/" : rawPath;
+    }
+
+    private static URI rebuildUri(URI baseUri, String rawPath) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        builder.append(baseUri.getScheme()).append(":");
+        if (baseUri.getRawAuthority() != null) {
+            builder.append("//").append(baseUri.getRawAuthority());
+        }
+        builder.append(rawPath == null || rawPath.length() == 0 ? "/" : rawPath);
+        if (baseUri.getRawQuery() != null) {
+            builder.append("?").append(baseUri.getRawQuery());
+        }
+        if (baseUri.getRawFragment() != null) {
+            builder.append("#").append(baseUri.getRawFragment());
+        }
         try {
-            if (trimmedUrl.toLowerCase(Locale.US).endsWith(".json")) {
-                int slashIndex = trimmedUrl.lastIndexOf('/');
-                String parent = slashIndex >= 0 ? trimmedUrl.substring(0, slashIndex + 1) : "";
-                String fileName = slashIndex >= 0 ? trimmedUrl.substring(slashIndex + 1)
-                        : trimmedUrl;
-                return new URL(parent + fileName.substring(0, fileName.length() - 5)
-                        + backupSuffix);
-            }
-            if (!trimmedUrl.endsWith("/")) {
-                trimmedUrl += "/";
-            }
-            return new URL(trimmedUrl + SNAPSHOT_FILE_NAME.substring(0,
-                    SNAPSHOT_FILE_NAME.length() - 5) + backupSuffix);
-        } catch (MalformedURLException e) {
+            return new URI(builder.toString());
+        } catch (URISyntaxException e) {
             throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
         }
+    }
+
+    private static String decodePercentEncoded(String rawPath) {
+        StringBuilder decoded = new StringBuilder();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        for (int i = 0; i < rawPath.length(); i++) {
+            char current = rawPath.charAt(i);
+            if (current == '%' && i + 2 < rawPath.length()) {
+                int high = hexToInt(rawPath.charAt(i + 1));
+                int low = hexToInt(rawPath.charAt(i + 2));
+                if (high >= 0 && low >= 0) {
+                    bytes.write((high << 4) + low);
+                    i += 2;
+                    continue;
+                }
+            }
+            appendDecodedBytes(decoded, bytes);
+            decoded.append(current);
+        }
+        appendDecodedBytes(decoded, bytes);
+        return decoded.toString();
+    }
+
+    private static void appendDecodedBytes(StringBuilder decoded, ByteArrayOutputStream bytes) {
+        if (bytes.size() > 0) {
+            decoded.append(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+            bytes.reset();
+        }
+    }
+
+    private static int hexToInt(char value) {
+        if (value >= '0' && value <= '9') {
+            return value - '0';
+        }
+        if (value >= 'a' && value <= 'f') {
+            return value - 'a' + 10;
+        }
+        if (value >= 'A' && value <= 'F') {
+            return value - 'A' + 10;
+        }
+        return -1;
     }
 
     private void throwForResponse(String method, int responseCode) throws IOException {
