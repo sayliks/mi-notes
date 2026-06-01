@@ -73,33 +73,32 @@ public class WebDavClientTest {
 
     @Test
     public void resolveBackupUrl_usesDeterministicFolderBackupName() throws Exception {
-        URL url = WebDavClient.resolveBackupUrl("https://example.com/dav/笔记", 42);
+        URL url = WebDavClient.resolveBackupUrl("https://example.com/dav/笔记");
 
         assertEquals("https://example.com/dav/%E7%AC%94%E8%AE%B0/"
-                        + "mi-notes-sync.backup-42.json",
+                        + "mi-notes-sync.backup.json",
                 url.toExternalForm());
     }
 
     @Test
     public void resolveBackupUrl_preservesChineseDirectFileBaseName() throws Exception {
         URL url = WebDavClient.resolveBackupUrl(
-                "https://example.com/dav/小米便签同步.json", 42);
+                "https://example.com/dav/小米便签同步.json");
 
         assertEquals("https://example.com/dav/"
                         + "%E5%B0%8F%E7%B1%B3%E4%BE%BF%E7%AD%BE%E5%90%8C%E6%AD%A5"
-                        + ".backup-42.json",
+                        + ".backup.json",
                 url.toExternalForm());
     }
 
     @Test
     public void resolveBackupUrl_preservesAlreadyEncodedDirectFileBaseName() throws Exception {
         URL url = WebDavClient.resolveBackupUrl("https://example.com/dav/"
-                + "%E5%B0%8F%E7%B1%B3%E4%BE%BF%E7%AD%BE%E5%90%8C%E6%AD%A5.json",
-                42);
+                + "%E5%B0%8F%E7%B1%B3%E4%BE%BF%E7%AD%BE%E5%90%8C%E6%AD%A5.json");
 
         assertEquals("https://example.com/dav/"
                         + "%E5%B0%8F%E7%B1%B3%E4%BE%BF%E7%AD%BE%E5%90%8C%E6%AD%A5"
-                        + ".backup-42.json",
+                        + ".backup.json",
                 url.toExternalForm());
         assertFalse(url.toExternalForm().contains("%25E5"));
     }
