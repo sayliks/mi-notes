@@ -128,7 +128,7 @@
     <string name="preferences_webdav_last_result_success">成功</string>
     <string name="preferences_webdav_last_result_failed">失敗</string>
     <string name="preferences_webdav_last_result_format">%3$s\n%1$s\n%2$s</string>
-    <string name="preferences_webdav_help">使用 WebDAV 資料夾 URL 時會儲存 mi-notes-sync.json；也可以填寫以 mi-notes-sync.json 結尾的完整檔案 URL。衝突規則：遠端快照較新且本機沒有本地修改時下載；否則上傳本機便籤。本地匯入或覆蓋遠端前會寫入帶時間戳的備份。</string>
+    <string name="preferences_webdav_help">使用 WebDAV 資料夾 URL 時會儲存 mi-notes-sync.json；也可以填寫完整的 .json 檔案 URL，支援「小米便簽同步.json」這類中文檔名。衝突規則：遠端快照較新且本機沒有本地修改時下載；否則上傳本機便籤。本地匯入或覆蓋遠端前會寫入帶時間戳的備份。</string>
     <string name="preferences_last_sync_time">上次同步于 %1$s</string>
     <string name="preferences_last_sync_time_format">yyyy-MM-dd HH:mm:ss</string>
     <string name="preferences_last_sync_time_never">上次同步：尚未同步</string>
