@@ -1,0 +1,370 @@
+# Instincts generated from https://github.com/sayliks/mi-notes
+# Generated: 2026-06-01T04:02:33.634Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: mi-notes-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Commit Length
+
+## Action
+
+Keep commit messages concise (~34 characters)
+
+## Evidence
+
+- Average commit message length: 34 chars
+- Based on 6 commits
+
+---
+id: mi-notes-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: mi-notes-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: mi-notes-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: mi-notes-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: mi-notes-workflow-add-or-enhance-sync-feature
+trigger: "when doing add or enhance sync feature"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Workflow Add Or Enhance Sync Feature
+
+## Action
+
+Follow the add-or-enhance-sync-feature workflow:
+1. Create or update Java classes for the sync provider under app/src/main/java/net/micode/notes/sync/[provider]/
+2. Update AndroidManifest.xml to register new services or permissions
+3. Modify UI activity classes (e.g., NoteEditActivity, NotesPreferenceActivity, NotesListActivity) to integrate the new sync feature
+4. Add or update string resources in app/src/main/values/strings.xml and res/values/strings.xml
+5. If needed, add or update translations in app/src/main/values-zh-rCN/strings.xml, app/src/main/values-zh-rTW/strings.xml, res/values-zh-rCN/strings.xml, and res/values-zh-rTW/strings.xml
+6. Update or create relevant layout XML files (e.g., res/layout/activity_preferences.xml) to reflect new sync options
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: app/src/main/java/net/micode/notes/sync/*/*.java, app/src/main/AndroidManifest.xml, app/src/main/java/net/micode/notes/ui/*.java
+
+---
+id: mi-notes-workflow-localization-update-for-new-feature
+trigger: "when doing localization update for new feature"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sayliks/mi-notes
+---
+
+# Mi Notes Workflow Localization Update For New Feature
+
+## Action
+
+Follow the localization-update-for-new-feature workflow:
+1. Identify new or changed strings in app/src/main/values/strings.xml and res/values/strings.xml
+2. Update or add translations in app/src/main/values-zh-rCN/strings.xml, app/src/main/values-zh-rTW/strings.xml, res/values-zh-rCN/strings.xml, and res/values-zh-rTW/strings.xml
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: app/src/main/values-zh-rCN/strings.xml, app/src/main/values-zh-rTW/strings.xml, res/values-zh-rCN/strings.xml
+
+---
+id: mi-notes-instinct-naming-files
+trigger: "When creating or renaming a Java file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Naming Files
+
+## Action
+
+Use PascalCase for the file name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+- Examples in app/src/main/java/net/micode/notes/sync/*/*.java
+
+---
+id: mi-notes-instinct-naming-classes
+trigger: "When defining a Java class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Naming Classes
+
+## Action
+
+Use PascalCase for the class name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+- Examples in app/src/main/java/net/micode/notes/ui/*.java
+
+---
+id: mi-notes-instinct-naming-functions
+trigger: "When defining a Java method"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Naming Functions
+
+## Action
+
+Use camelCase for the method name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: mi-notes-instinct-naming-constants
+trigger: "When defining a constant in Java"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Naming Constants
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: mi-notes-instinct-import-style
+trigger: "When importing Java classes"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: mi-notes-instinct-export-style
+trigger: "When exporting Java classes or members"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: mi-notes-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Test Location
+
+## Action
+
+Place test files in a separate test directory, not mixed with source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: mi-notes-instinct-commit-prefix-fix
+trigger: "When making a commit that fixes a bug or compatibility issue"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Commit Prefix Fix
+
+## Action
+
+Prefix the commit message with 'fix:'
+
+## Evidence
+
+- Seen in commit 'fix: improve modern Android compatibility'
+- Pattern in commits.prefixes
+
+---
+id: mi-notes-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, around 34 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: mi-notes-instinct-add-sync-provider
+trigger: "When someone wants to add a new sync provider or enhance sync functionality"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Add Sync Provider
+
+## Action
+
+Follow the workflow: create/update sync Java classes, register in AndroidManifest.xml, update UI activities, update/add string resources and translations, update/create relevant layout XML files
+
+## Evidence
+
+- Workflow: add-or-enhance-sync-feature
+- Example commits and files in workflow definition
+
+---
+id: mi-notes-instinct-localization-update
+trigger: "When user-facing strings are added or updated for a feature"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: sayliks/mi-notes
+---
+
+# Mi Notes Instinct Localization Update
+
+## Action
+
+Update or add translations in all supported language string resource files
+
+## Evidence
+
+- Workflow: localization-update-for-new-feature
+- Example commits and files in workflow definition
+
