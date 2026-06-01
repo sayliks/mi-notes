@@ -146,6 +146,11 @@
             android:exported="false" >
         </service>
 
+        <service
+            android:name="net.micode.notes.sync.webdav.WebDavSyncService"
+            android:exported="false" >
+        </service>
+
         <meta-data
             android:name="android.app.default_searchable"
             android:value=".ui.NoteEditActivity" />

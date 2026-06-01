@@ -610,7 +610,7 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     }
 
     private boolean isSyncMode() {
-        return NotesPreferenceActivity.getSyncAccountName(this).trim().length() > 0;
+        return NotesPreferenceActivity.isSyncConfigured(this);
     }
 
     public void onClockAlertChanged(long date, boolean set) {

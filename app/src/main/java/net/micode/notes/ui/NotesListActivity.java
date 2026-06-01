@@ -62,8 +62,8 @@ import android.widget.Toast;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
-import net.micode.notes.gtask.remote.GTaskSyncService;
 import net.micode.notes.model.WorkingNote;
+import net.micode.notes.sync.webdav.WebDavSyncService;
 import net.micode.notes.tool.BackupUtils;
 import net.micode.notes.tool.DataUtils;
 import net.micode.notes.tool.ResourceParser;
@@ -698,7 +698,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
             getMenuInflater().inflate(R.menu.note_list, menu);
             // set sync or sync_cancel
             menu.findItem(R.id.menu_sync).setTitle(
-                    GTaskSyncService.isSyncing() ? R.string.menu_sync_cancel : R.string.menu_sync);
+                    WebDavSyncService.isSyncing() ? R.string.menu_sync_cancel : R.string.menu_sync);
         } else if (mState == ListEditState.SUB_FOLDER) {
             getMenuInflater().inflate(R.menu.sub_folder, menu);
         } else if (mState == ListEditState.CALL_RECORD_FOLDER) {
@@ -719,9 +719,9 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         } else if (itemId == R.id.menu_sync) {
             if (isSyncMode()) {
                 if (TextUtils.equals(item.getTitle(), getString(R.string.menu_sync))) {
-                    GTaskSyncService.startSync(this);
+                    WebDavSyncService.startSync(this);
                 } else {
-                    GTaskSyncService.cancelSync(this);
+                    WebDavSyncService.cancelSync(this);
                 }
             } else {
                 startPreferenceActivity();
@@ -785,7 +785,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     }
 
     private boolean isSyncMode() {
-        return NotesPreferenceActivity.getSyncAccountName(this).trim().length() > 0;
+        return NotesPreferenceActivity.isSyncConfigured(this);
     }
 
     private void startPreferenceActivity() {
