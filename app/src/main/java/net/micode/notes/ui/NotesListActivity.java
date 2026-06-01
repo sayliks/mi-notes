@@ -55,6 +55,7 @@ import android.widget.Toast;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
+import net.micode.notes.data.entity.NoteEntity;
 import net.micode.notes.model.WorkingNote;
 import net.micode.notes.sync.webdav.WebDavSyncService;
 import net.micode.notes.tool.BackupUtils;
