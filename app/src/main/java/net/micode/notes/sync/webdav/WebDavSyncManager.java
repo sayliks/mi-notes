@@ -61,6 +61,8 @@ public class WebDavSyncManager {
 
     public static final int STATE_REMOTE_NOT_FOUND = 10;
 
+    public static final int STATE_BACKUP_ERROR = 11;
+
     private static final String JSON_VERSION = "version";
 
     private static final String JSON_GENERATED_AT = "generated_at";
@@ -165,6 +167,12 @@ public class WebDavSyncManager {
         mCancelled = true;
     }
 
+    interface SnapshotTransport {
+        void putSnapshot(String snapshot) throws IOException;
+
+        void putBackupSnapshot(String snapshot) throws IOException;
+    }
+
     public int sync(Context context, WebDavSyncTask asyncTask) {
         synchronized (this) {
             if (mSyncing) {
@@ -194,11 +202,7 @@ public class WebDavSyncManager {
                 return STATE_SYNC_CANCELLED;
             }
 
-            JSONObject remoteSnapshot = null;
-            if (!TextUtils.isEmpty(remotePayload)) {
-                remoteSnapshot = new JSONObject(remotePayload);
-                validateSnapshot(remoteSnapshot);
-            }
+            JSONObject remoteSnapshot = parseRemoteSnapshot(remotePayload);
 
             boolean localChanged = hasLocalChanges(context);
             long lastSyncTime = NotesPreferenceActivity.getLastSyncTime(context);
@@ -218,14 +222,13 @@ public class WebDavSyncManager {
                         context.getString(R.string.sync_result_downloaded_remote));
             } else {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_uploading));
-                backupRemoteSnapshot(client, remotePayload);
                 JSONObject localSnapshot = exportSnapshot(context);
                 if (mCancelled) {
                     NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
                             context.getString(R.string.sync_result_cancelled));
                     return STATE_SYNC_CANCELLED;
                 }
-                client.putSnapshot(localSnapshot.toString());
+                uploadSnapshotSafely(client, remotePayload, localSnapshot.toString());
                 cleanupTrash(context);
                 resetLocalModified(context);
                 int messageResId = remoteSnapshot != null && remoteGeneratedAt > lastSyncTime
@@ -242,6 +245,11 @@ public class WebDavSyncManager {
             }
             NotesPreferenceActivity.setLastSyncTime(context, System.currentTimeMillis());
             return STATE_SUCCESS;
+        } catch (SnapshotBackupException e) {
+            Log.e(TAG, "WebDAV backup error", e);
+            NotesPreferenceActivity.setLastSyncResult(context, STATE_BACKUP_ERROR,
+                    context.getString(R.string.sync_result_backup_error));
+            return STATE_BACKUP_ERROR;
         } catch (WebDavClient.WebDavException e) {
             Log.e(TAG, "WebDAV protocol error", e);
             int state = mapWebDavError(e);
@@ -324,6 +332,8 @@ public class WebDavSyncManager {
                 return R.string.sync_result_invalid_url;
             case STATE_REMOTE_NOT_FOUND:
                 return R.string.sync_result_remote_not_found;
+            case STATE_BACKUP_ERROR:
+                return R.string.sync_result_backup_error;
             default:
                 return R.string.sync_result_internal_error;
         }
@@ -345,17 +355,57 @@ public class WebDavSyncManager {
         }
     }
 
-    private void backupRemoteSnapshot(WebDavClient client, String remotePayload)
-            throws IOException {
-        if (!TextUtils.isEmpty(remotePayload)) {
-            client.putBackupSnapshot(remotePayload, System.currentTimeMillis());
+    private void backupLocalSnapshot(Context context, WebDavClient client)
+            throws IOException, JSONException {
+        backupSnapshotSafely(client, exportSnapshot(context, true).toString());
+    }
+
+    static JSONObject parseRemoteSnapshot(String remotePayload) throws JSONException {
+        if (isEmpty(remotePayload)) {
+            return null;
+        }
+        JSONObject snapshot = new JSONObject(remotePayload);
+        validateSnapshot(snapshot);
+        return snapshot;
+    }
+
+    static void uploadSnapshotSafely(SnapshotTransport client, String previousSnapshot,
+            String newSnapshot) throws IOException {
+        backupSnapshotSafely(client, previousSnapshot);
+        try {
+            client.putSnapshot(newSnapshot);
+        } catch (IOException e) {
+            restoreRemoteSnapshot(client, previousSnapshot, e);
+            throw e;
         }
     }
 
-    private void backupLocalSnapshot(Context context, WebDavClient client)
-            throws IOException, JSONException {
-        client.putBackupSnapshot(exportSnapshot(context, true).toString(),
-                System.currentTimeMillis());
+    static void backupSnapshotSafely(SnapshotTransport client, String snapshot)
+            throws IOException {
+        if (isEmpty(snapshot)) {
+            return;
+        }
+        try {
+            client.putBackupSnapshot(snapshot);
+        } catch (IOException e) {
+            throw new SnapshotBackupException(e);
+        }
+    }
+
+    private static void restoreRemoteSnapshot(SnapshotTransport client, String previousSnapshot,
+            IOException uploadError) {
+        if (isEmpty(previousSnapshot)) {
+            return;
+        }
+        try {
+            client.putSnapshot(previousSnapshot);
+        } catch (IOException restoreError) {
+            uploadError.addSuppressed(restoreError);
+        }
+    }
+
+    private static boolean isEmpty(String value) {
+        return value == null || value.length() == 0;
     }
 
     private boolean hasLocalChanges(Context context) {
@@ -374,7 +424,7 @@ public class WebDavSyncManager {
         }
     }
 
-    private void validateSnapshot(JSONObject snapshot) throws JSONException {
+    private static void validateSnapshot(JSONObject snapshot) throws JSONException {
         if (snapshot.optInt(JSON_VERSION, -1) != 1 || !snapshot.has(JSON_NOTES)
                 || !snapshot.has(JSON_DATA)) {
             throw new JSONException("Invalid WebDAV snapshot");
@@ -598,5 +648,11 @@ public class WebDavSyncManager {
         values.put(DataColumns.DATA4, data.optString(DataColumns.DATA4, ""));
         values.put(DataColumns.DATA5, data.optString(DataColumns.DATA5, ""));
         return values;
+    }
+
+    static class SnapshotBackupException extends IOException {
+        SnapshotBackupException(IOException cause) {
+            super(cause);
+        }
     }
 }

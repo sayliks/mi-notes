@@ -31,7 +31,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-class WebDavClient {
+class WebDavClient implements WebDavSyncManager.SnapshotTransport {
     static final int ERROR_INVALID_URL = 0;
 
     static final int ERROR_AUTH = 1;
@@ -102,12 +102,14 @@ class WebDavClient {
         }
     }
 
-    void putSnapshot(String snapshot) throws IOException {
+    @Override
+    public void putSnapshot(String snapshot) throws IOException {
         putJson(getSnapshotUrl(), snapshot);
     }
 
-    void putBackupSnapshot(String snapshot, long timestamp) throws IOException {
-        putJson(getBackupUrl(timestamp), snapshot);
+    @Override
+    public void putBackupSnapshot(String snapshot) throws IOException {
+        putJson(getBackupUrl(), snapshot);
     }
 
     private void putJson(URL url, String snapshot) throws IOException {
@@ -163,8 +165,8 @@ class WebDavClient {
         return resolveSnapshotUrl(mUrl);
     }
 
-    private URL getBackupUrl(long timestamp) throws IOException {
-        return resolveBackupUrl(mUrl, timestamp);
+    private URL getBackupUrl() throws IOException {
+        return resolveBackupUrl(mUrl);
     }
 
     static URL resolveSnapshotUrl(String url) throws IOException {
@@ -175,9 +177,9 @@ class WebDavClient {
         return toUrl(rebuildUri(uri, appendPathSegment(uri.getRawPath(), SNAPSHOT_FILE_NAME)));
     }
 
-    static URL resolveBackupUrl(String url, long timestamp) throws IOException {
+    static URL resolveBackupUrl(String url) throws IOException {
         URI uri = parseWebDavUri(url);
-        String backupSuffix = ".backup-" + timestamp + ".json";
+        String backupSuffix = ".backup.json";
         if (isDirectJsonUrl(uri)) {
             String rawPath = getRawPath(uri);
             int slashIndex = rawPath.lastIndexOf('/');
