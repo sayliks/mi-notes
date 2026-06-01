@@ -4,6 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
@@ -27,6 +28,16 @@
             android:layout_marginRight="30dip"
             style="?android:attr/textAppearanceMedium"
             android:text="@string/preferences_button_sync_immediately" />
+
+        <Button
+            android:id="@+id/preference_test_connection_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="30dip"
+            android:layout_marginEnd="30dip"
+            android:contentDescription="@string/preferences_webdav_test_connection_summary"
+            style="?android:attr/textAppearanceMedium"
+            android:text="@string/preferences_webdav_test_connection" />
 
         <TextView
             android:id="@+id/prefenerece_sync_status_textview"

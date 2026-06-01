@@ -26,18 +26,24 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.AsyncTask;
 import android.text.TextUtils;
+import android.text.InputType;
 import android.text.format.DateFormat;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 import androidx.preference.CheckBoxPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -46,15 +52,38 @@ import androidx.preference.PreferenceFragmentCompat;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
-import net.micode.notes.gtask.remote.GTaskSyncService;
+import net.micode.notes.sync.webdav.WebDavSyncManager;
+import net.micode.notes.sync.webdav.WebDavSyncService;
+
+import java.lang.ref.WeakReference;
 
 
 public class NotesPreferenceActivity extends AppCompatActivity {
+    private static final String TAG = NotesPreferenceActivity.class.getSimpleName();
+
     public static final String PREFERENCE_NAME = "notes_preferences";
 
     public static final String PREFERENCE_SYNC_ACCOUNT_NAME = "pref_key_account_name";
 
+    public static final String PREFERENCE_WEBDAV_URL = "pref_key_webdav_url";
+
+    public static final String PREFERENCE_WEBDAV_USERNAME = "pref_key_webdav_username";
+
+    public static final String PREFERENCE_WEBDAV_PASSWORD = "pref_key_webdav_password";
+
     public static final String PREFERENCE_LAST_SYNC_TIME = "pref_last_sync_time";
+
+    public static final String PREFERENCE_LAST_SYNC_RESULT_MESSAGE = "pref_last_sync_result_message";
+
+    public static final String PREFERENCE_LAST_SYNC_RESULT_TIME = "pref_last_sync_result_time";
+
+    public static final String PREFERENCE_LAST_SYNC_RESULT_STATE = "pref_last_sync_result_state";
+
+    private static final int LAST_SYNC_RESULT_NEVER = 0;
+
+    private static final int LAST_SYNC_RESULT_SUCCESS = 1;
+
+    private static final int LAST_SYNC_RESULT_FAILED = 2;
 
     public static final String PREFERENCE_SET_BG_COLOR_KEY = "pref_key_bg_random_appear";
 
@@ -63,6 +92,8 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     private static final String AUTHORITIES_FILTER_KEY = "authorities";
 
     private GTaskReceiver mReceiver;
+
+    private boolean mReceiverRegistered;
 
     private Account[] mOriAccounts;
 
@@ -87,8 +118,10 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
         mReceiver = new GTaskReceiver();
         IntentFilter filter = new IntentFilter();
-        filter.addAction(GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME);
-        registerReceiver(mReceiver, filter);
+        filter.addAction(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_NAME);
+        ContextCompat.registerReceiver(this, mReceiver, filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        mReceiverRegistered = true;
 
         mOriAccounts = null;
     }
@@ -96,35 +129,14 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
-        // need to set sync account automatically if user has added a new
-        // account
-        if (mHasAddedAccount) {
-            Account[] accounts = getGoogleAccounts();
-            if (mOriAccounts != null && accounts.length > mOriAccounts.length) {
-                for (Account accountNew : accounts) {
-                    boolean found = false;
-                    for (Account accountOld : mOriAccounts) {
-                        if (TextUtils.equals(accountOld.name, accountNew.name)) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        setSyncAccount(accountNew.name);
-                        break;
-                    }
-                }
-            }
-        }
-
         refreshUI();
     }
 
     @Override
     protected void onDestroy() {
-        if (mReceiver != null) {
+        if (mReceiverRegistered && mReceiver != null) {
             unregisterReceiver(mReceiver);
+            mReceiverRegistered = false;
         }
         super.onDestroy();
     }
@@ -144,23 +156,18 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         accountCategory.removeAll();
 
         Preference accountPref = new Preference(this);
-        final String defaultAccount = getSyncAccountName(this);
-        accountPref.setTitle(getString(R.string.preferences_account_title));
-        accountPref.setSummary(getString(R.string.preferences_account_summary));
+        accountPref.setTitle(getString(R.string.preferences_webdav_title));
+        String webDavUrl = getWebDavUrl(this);
+        accountPref.setSummary(TextUtils.isEmpty(webDavUrl)
+                ? getString(R.string.preferences_webdav_summary_not_configured)
+                : getString(R.string.preferences_webdav_summary_configured, webDavUrl));
         accountPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             public boolean onPreferenceClick(Preference preference) {
-                if (!GTaskSyncService.isSyncing()) {
-                    if (TextUtils.isEmpty(defaultAccount)) {
-                        // the first time to set account
-                        showSelectAccountAlertDialog();
-                    } else {
-                        // if the account has already been set, we need to promp
-                        // user about the risk
-                        showChangeAccountConfirmAlertDialog();
-                    }
+                if (!WebDavSyncService.isSyncing()) {
+                    showWebDavSettingsDialog();
                 } else {
                     Toast.makeText(NotesPreferenceActivity.this,
-                            R.string.preferences_toast_cannot_change_account, Toast.LENGTH_SHORT)
+                            R.string.preferences_toast_cannot_change_sync_settings, Toast.LENGTH_SHORT)
                             .show();
                 }
                 return true;
@@ -168,33 +175,49 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         });
 
         accountCategory.addPreference(accountPref);
+
+        Preference resultPref = new Preference(this);
+        resultPref.setTitle(R.string.preferences_webdav_last_result_title);
+        resultPref.setSummary(getLastSyncResultSummary(this));
+        resultPref.setSelectable(false);
+        accountCategory.addPreference(resultPref);
     }
 
     private void loadSyncButton() {
         Button syncButton = (Button) findViewById(R.id.preference_sync_button);
+        Button testConnectionButton = (Button) findViewById(R.id.preference_test_connection_button);
         TextView lastSyncTimeView = (TextView) findViewById(R.id.prefenerece_sync_status_textview);
 
         // set button state
-        if (GTaskSyncService.isSyncing()) {
+        if (WebDavSyncService.isSyncing()) {
             syncButton.setText(getString(R.string.preferences_button_sync_cancel));
             syncButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    GTaskSyncService.cancelSync(NotesPreferenceActivity.this);
+                    WebDavSyncService.cancelSync(NotesPreferenceActivity.this);
                 }
             });
         } else {
             syncButton.setText(getString(R.string.preferences_button_sync_immediately));
             syncButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    GTaskSyncService.startSync(NotesPreferenceActivity.this);
+                    WebDavSyncService.startSync(NotesPreferenceActivity.this);
                 }
             });
         }
-        syncButton.setEnabled(!TextUtils.isEmpty(getSyncAccountName(this)));
+        syncButton.setEnabled(isSyncConfigured(this));
+
+        if (testConnectionButton != null) {
+            testConnectionButton.setEnabled(!WebDavSyncService.isSyncing());
+            testConnectionButton.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    testWebDavConnection();
+                }
+            });
+        }
 
         // set last sync time
-        if (GTaskSyncService.isSyncing()) {
-            lastSyncTimeView.setText(GTaskSyncService.getProgressString());
+        if (WebDavSyncService.isSyncing()) {
+            lastSyncTimeView.setText(WebDavSyncService.getProgressString());
             lastSyncTimeView.setVisibility(View.VISIBLE);
         } else {
             long lastSyncTime = getLastSyncTime(this);
@@ -202,16 +225,72 @@ public class NotesPreferenceActivity extends AppCompatActivity {
                 lastSyncTimeView.setText(getString(R.string.preferences_last_sync_time,
                         DateFormat.format(getString(R.string.preferences_last_sync_time_format),
                                 lastSyncTime)));
-                lastSyncTimeView.setVisibility(View.VISIBLE);
             } else {
-                lastSyncTimeView.setVisibility(View.GONE);
+                lastSyncTimeView.setText(getString(R.string.preferences_last_sync_time_never));
             }
+            lastSyncTimeView.setVisibility(View.VISIBLE);
         }
     }
 
     private void refreshUI() {
         loadAccountPreference();
         loadSyncButton();
+    }
+
+    private void showWebDavSettingsDialog() {
+        final EditText urlInput = new EditText(this);
+        urlInput.setSingleLine(true);
+        urlInput.setHint(R.string.preferences_webdav_url_hint);
+        urlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        urlInput.setText(getWebDavUrl(this));
+
+        final EditText userInput = new EditText(this);
+        userInput.setSingleLine(true);
+        userInput.setHint(R.string.preferences_webdav_username_hint);
+        userInput.setText(getWebDavUserName(this));
+
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.preferences_webdav_password_hint);
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passwordInput.setText(getWebDavPassword(this));
+
+        TextView helpView = new TextView(this);
+        helpView.setText(R.string.preferences_webdav_help);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(helpView);
+        container.addView(urlInput);
+        container.addView(userInput);
+        container.addView(passwordInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.preferences_webdav_dialog_title)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        setWebDavConfig(urlInput.getText().toString(),
+                                userInput.getText().toString(),
+                                passwordInput.getText().toString());
+                        refreshUI();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void testWebDavConnection() {
+        if (!isSyncConfigured(this)) {
+            Toast.makeText(this, R.string.sync_result_not_configured, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Toast.makeText(this, R.string.sync_progress_webdav_testing, Toast.LENGTH_SHORT).show();
+        new WebDavConnectionTestTask(this).execute();
     }
 
     private void showSelectAccountAlertDialog() {
@@ -264,7 +343,11 @@ public class NotesPreferenceActivity extends AppCompatActivity {
                 intent.putExtra(AUTHORITIES_FILTER_KEY, new String[] {
                     "gmail-ls"
                 });
-                startActivityForResult(intent, -1);
+                try {
+                    startActivityForResult(intent, -1);
+                } catch (Exception e) {
+                    Log.w(TAG, "Unable to open add-account settings", e);
+                }
                 dialog.dismiss();
             }
         });
@@ -301,7 +384,12 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
     private Account[] getGoogleAccounts() {
         AccountManager accountManager = AccountManager.get(this);
-        return accountManager.getAccountsByType("com.google");
+        try {
+            return accountManager.getAccountsByType("com.google");
+        } catch (SecurityException e) {
+            Log.w(TAG, "Unable to read Google accounts", e);
+            return new Account[0];
+        }
     }
 
     private void setSyncAccount(String account) {
@@ -362,6 +450,71 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         return settings.getString(PREFERENCE_SYNC_ACCOUNT_NAME, "");
     }
 
+    public static String getWebDavUrl(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_URL, "");
+    }
+
+    public static String getWebDavUserName(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_USERNAME, "");
+    }
+
+    public static String getWebDavPassword(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_PASSWORD, "");
+    }
+
+    public static boolean isSyncConfigured(Context context) {
+        return !TextUtils.isEmpty(getWebDavUrl(context).trim());
+    }
+
+    private void setWebDavConfig(String url, String userName, String password) {
+        SharedPreferences settings = getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PREFERENCE_WEBDAV_URL, url == null ? "" : url.trim());
+        editor.putString(PREFERENCE_WEBDAV_USERNAME, userName == null ? "" : userName.trim());
+        editor.putString(PREFERENCE_WEBDAV_PASSWORD, password == null ? "" : password);
+        editor.commit();
+    }
+
+    public static void setLastSyncResult(Context context, int result, String message) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putInt(PREFERENCE_LAST_SYNC_RESULT_STATE, result == WebDavSyncManager.STATE_SUCCESS
+                ? LAST_SYNC_RESULT_SUCCESS : LAST_SYNC_RESULT_FAILED);
+        editor.putString(PREFERENCE_LAST_SYNC_RESULT_MESSAGE, message == null ? "" : message);
+        editor.putLong(PREFERENCE_LAST_SYNC_RESULT_TIME, System.currentTimeMillis());
+        editor.commit();
+    }
+
+    public static String getLastSyncResultMessage(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_LAST_SYNC_RESULT_MESSAGE, "");
+    }
+
+    public static String getLastSyncResultSummary(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        int state = settings.getInt(PREFERENCE_LAST_SYNC_RESULT_STATE, LAST_SYNC_RESULT_NEVER);
+        String message = settings.getString(PREFERENCE_LAST_SYNC_RESULT_MESSAGE, "");
+        long time = settings.getLong(PREFERENCE_LAST_SYNC_RESULT_TIME, 0);
+        if (state == LAST_SYNC_RESULT_NEVER || TextUtils.isEmpty(message) || time == 0) {
+            return context.getString(R.string.preferences_webdav_last_result_never);
+        }
+        String stateText = context.getString(state == LAST_SYNC_RESULT_SUCCESS
+                ? R.string.preferences_webdav_last_result_success
+                : R.string.preferences_webdav_last_result_failed);
+        return context.getString(R.string.preferences_webdav_last_result_format, message,
+                DateFormat.format(context.getString(R.string.preferences_last_sync_time_format),
+                        time), stateText);
+    }
+
     public static void setLastSyncTime(Context context, long time) {
         SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
                 Context.MODE_PRIVATE);
@@ -394,15 +547,48 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         }
     }
 
+    private static class WebDavConnectionTestTask extends AsyncTask<Void, Void, Integer> {
+        private final WeakReference<NotesPreferenceActivity> mActivityRef;
+
+        private final WeakReference<Context> mContextRef;
+
+        WebDavConnectionTestTask(NotesPreferenceActivity activity) {
+            mActivityRef = new WeakReference<NotesPreferenceActivity>(activity);
+            mContextRef = new WeakReference<Context>(activity.getApplicationContext());
+        }
+
+        @Override
+        protected Integer doInBackground(Void... unused) {
+            Context context = mContextRef.get();
+            if (context == null) {
+                return WebDavSyncManager.STATE_INTERNAL_ERROR;
+            }
+            return WebDavSyncManager.getInstance().testConnection(context);
+        }
+
+        @Override
+        protected void onPostExecute(Integer result) {
+            NotesPreferenceActivity activity = mActivityRef.get();
+            if (activity == null || activity.isFinishing()) {
+                return;
+            }
+            int state = result == null ? WebDavSyncManager.STATE_INTERNAL_ERROR : result;
+            int messageResId = state == WebDavSyncManager.STATE_SUCCESS
+                    ? R.string.preferences_webdav_test_success
+                    : WebDavSyncManager.getResultMessageResId(state);
+            Toast.makeText(activity, messageResId, Toast.LENGTH_LONG).show();
+        }
+    }
+
     private class GTaskReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
             refreshUI();
-            if (intent.getBooleanExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_IS_SYNCING, false)) {
+            if (intent.getBooleanExtra(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_IS_SYNCING, false)) {
                 TextView syncStatus = (TextView) findViewById(R.id.prefenerece_sync_status_textview);
                 syncStatus.setText(intent
-                        .getStringExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_PROGRESS_MSG));
+                        .getStringExtra(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG));
             }
 
         }

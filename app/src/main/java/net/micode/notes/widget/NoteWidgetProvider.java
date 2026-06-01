@@ -22,6 +22,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.os.Build;
 import android.util.Log;
 import android.widget.RemoteViews;
 
@@ -107,15 +108,19 @@ public abstract class NoteWidgetProvider extends AppWidgetProvider {
                  * Generate the pending intent to start host for the widget
                  */
                 PendingIntent pendingIntent = null;
+                int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
+                }
                 if (privacyMode) {
                     rv.setTextViewText(R.id.widget_text,
                             context.getString(R.string.widget_under_visit_mode));
                     pendingIntent = PendingIntent.getActivity(context, appWidgetIds[i], new Intent(
-                            context, NotesListActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                            context, NotesListActivity.class), pendingIntentFlags);
                 } else {
                     rv.setTextViewText(R.id.widget_text, snippet);
                     pendingIntent = PendingIntent.getActivity(context, appWidgetIds[i], intent,
-                            PendingIntent.FLAG_UPDATE_CURRENT);
+                            pendingIntentFlags);
                 }
 
                 rv.setOnClickPendingIntent(R.id.widget_text, pendingIntent);

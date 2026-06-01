@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.micode.notes.gtask.remote;
+package net.micode.notes.sync.webdav;
 
 import android.app.Activity;
 import android.app.Service;
@@ -24,37 +24,48 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
-public class GTaskSyncService extends Service {
-    private static final String TAG = GTaskSyncService.class.getSimpleName();
+public class WebDavSyncService extends Service {
+    private static final String TAG = WebDavSyncService.class.getSimpleName();
 
-    public final static String ACTION_STRING_NAME = "sync_action_type";
+    public static final String ACTION_STRING_NAME = "webdav_sync_action_type";
 
-    public final static int ACTION_START_SYNC = 0;
+    public static final int ACTION_START_SYNC = 0;
 
-    public final static int ACTION_CANCEL_SYNC = 1;
+    public static final int ACTION_CANCEL_SYNC = 1;
 
-    public final static int ACTION_INVALID = 2;
+    public static final int ACTION_INVALID = 2;
 
-    public final static String GTASK_SERVICE_BROADCAST_NAME = "net.micode.notes.gtask.remote.gtask_sync_service";
+    public static final String WEBDAV_SERVICE_BROADCAST_NAME =
+            "net.micode.notes.sync.webdav.webdav_sync_service";
 
-    public final static String GTASK_SERVICE_BROADCAST_IS_SYNCING = "isSyncing";
+    public static final String WEBDAV_SERVICE_BROADCAST_IS_SYNCING = "isSyncing";
 
-    public final static String GTASK_SERVICE_BROADCAST_PROGRESS_MSG = "progressMsg";
+    public static final String WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG = "progressMsg";
 
-    private static GTaskASyncTask mSyncTask = null;
+    public static final String WEBDAV_SERVICE_BROADCAST_RESULT = "result";
+
+    private static boolean mSyncRequested;
 
     private static String mSyncProgress = "";
 
+    private WebDavSyncTask mSyncTask;
+
     private void startSync() {
-        if (mSyncTask == null) {
-            mSyncTask = new GTaskASyncTask(this, new GTaskASyncTask.OnCompleteListener() {
-                public void onComplete() {
+        if (!isSyncing()) {
+            mSyncRequested = true;
+            mSyncTask = new WebDavSyncTask(this, new WebDavSyncTask.OnProgressListener() {
+                public void onProgress(String message) {
+                    sendBroadcast(message);
+                }
+            }, new WebDavSyncTask.OnCompleteListener() {
+                public void onComplete(int result) {
                     mSyncTask = null;
-                    sendBroadcast("");
+                    mSyncRequested = false;
+                    sendBroadcast("", result);
                     stopSelf();
                 }
             });
-            sendBroadcast("");
+            sendBroadcast("", WebDavSyncManager.STATE_SYNC_IN_PROGRESS);
             mSyncTask.execute();
         }
     }
@@ -62,12 +73,9 @@ public class GTaskSyncService extends Service {
     private void cancelSync() {
         if (mSyncTask != null) {
             mSyncTask.cancelSync();
+        } else if (WebDavSyncManager.getInstance().isSyncing()) {
+            WebDavSyncManager.getInstance().cancelSync();
         }
-    }
-
-    @Override
-    public void onCreate() {
-        mSyncTask = null;
     }
 
     @Override
@@ -93,48 +101,46 @@ public class GTaskSyncService extends Service {
     }
 
     @Override
-    public void onLowMemory() {
-        if (mSyncTask != null) {
-            mSyncTask.cancelSync();
-        }
-    }
-
     public IBinder onBind(Intent intent) {
         return null;
     }
 
     public void sendBroadcast(String msg) {
+        sendBroadcast(msg, WebDavSyncManager.STATE_SYNC_IN_PROGRESS);
+    }
+
+    public void sendBroadcast(String msg, int result) {
         mSyncProgress = msg;
-        Intent intent = new Intent(GTASK_SERVICE_BROADCAST_NAME);
+        Intent intent = new Intent(WEBDAV_SERVICE_BROADCAST_NAME);
         intent.setPackage(getPackageName());
-        intent.putExtra(GTASK_SERVICE_BROADCAST_IS_SYNCING, mSyncTask != null);
-        intent.putExtra(GTASK_SERVICE_BROADCAST_PROGRESS_MSG, msg);
+        intent.putExtra(WEBDAV_SERVICE_BROADCAST_IS_SYNCING, isSyncing());
+        intent.putExtra(WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG, msg);
+        intent.putExtra(WEBDAV_SERVICE_BROADCAST_RESULT, result);
         sendBroadcast(intent);
     }
 
     public static void startSync(Activity activity) {
-        GTaskManager.getInstance().setActivityContext(activity);
-        Intent intent = new Intent(activity, GTaskSyncService.class);
-        intent.putExtra(GTaskSyncService.ACTION_STRING_NAME, GTaskSyncService.ACTION_START_SYNC);
+        Intent intent = new Intent(activity, WebDavSyncService.class);
+        intent.putExtra(ACTION_STRING_NAME, ACTION_START_SYNC);
         try {
             activity.startService(intent);
         } catch (IllegalStateException e) {
-            Log.w(TAG, "Unable to start sync service", e);
+            Log.w(TAG, "Unable to start WebDAV sync service", e);
         }
     }
 
     public static void cancelSync(Context context) {
-        Intent intent = new Intent(context, GTaskSyncService.class);
-        intent.putExtra(GTaskSyncService.ACTION_STRING_NAME, GTaskSyncService.ACTION_CANCEL_SYNC);
+        Intent intent = new Intent(context, WebDavSyncService.class);
+        intent.putExtra(ACTION_STRING_NAME, ACTION_CANCEL_SYNC);
         try {
             context.startService(intent);
         } catch (IllegalStateException e) {
-            Log.w(TAG, "Unable to cancel sync service", e);
+            Log.w(TAG, "Unable to cancel WebDAV sync service", e);
         }
     }
 
     public static boolean isSyncing() {
-        return mSyncTask != null;
+        return mSyncRequested || WebDavSyncManager.getInstance().isSyncing();
     }
 
     public static String getProgressString() {

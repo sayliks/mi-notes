@@ -26,6 +26,7 @@
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.USE_CREDENTIALS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".app.NotesApplication"
@@ -142,6 +143,11 @@
 
         <service
             android:name="net.micode.notes.gtask.remote.GTaskSyncService"
+            android:exported="false" >
+        </service>
+
+        <service
+            android:name="net.micode.notes.sync.webdav.WebDavSyncService"
             android:exported="false" >
         </service>
 
