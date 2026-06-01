@@ -92,10 +92,19 @@
     <string name="sync_progress_login">登录%1$s...</string>
     <string name="sync_progress_init_list">正在获取服务器便签列表...</string>
     <string name="sync_progress_syncing">正在同步本地便签...</string>
+    <string name="sync_progress_webdav_connecting">正在连接 WebDAV...</string>
+    <string name="sync_progress_webdav_downloading">正在从 WebDAV 下载便签...</string>
+    <string name="sync_progress_webdav_uploading">正在上传便签到 WebDAV...</string>
     <!-- Preferences -->
     <string name="preferences_title">设置</string>
     <string name="preferences_account_title">同步账号</string>
     <string name="preferences_account_summary">与google task同步便签记录</string>
+    <string name="preferences_webdav_title">WebDAV 同步</string>
+    <string name="preferences_webdav_summary_not_configured">设置 WebDAV 文件夹或 JSON 文件 URL</string>
+    <string name="preferences_webdav_dialog_title">WebDAV 设置</string>
+    <string name="preferences_webdav_url_hint">WebDAV URL</string>
+    <string name="preferences_webdav_username_hint">用户名</string>
+    <string name="preferences_webdav_password_hint">密码</string>
     <string name="preferences_last_sync_time">上次同步于 %1$s</string>
     <string name="preferences_add_account">添加账号</string>
     <string name="preferences_menu_change_account">更换账号</string>
@@ -108,6 +117,7 @@
     <string name="preferences_dialog_select_account_title">同步便签</string>
     <string name="preferences_dialog_select_account_tips">请选择google帐号，便签将与该帐号的google task内容同步。</string>
     <string name="preferences_toast_cannot_change_account">正在同步中，不能修改同步帐号</string>
+    <string name="preferences_toast_cannot_change_sync_settings">正在同步中，不能修改同步设置</string>
     <string name="preferences_toast_success_set_accout">同步帐号已设置为%1$s</string>
     <string name="preferences_bg_random_appear_title">新建便签背景颜色随机</string>
     <string name="button_delete">删除</string>
