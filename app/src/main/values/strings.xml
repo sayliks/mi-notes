@@ -114,6 +114,7 @@
     <string name="sync_result_auth_error">WebDAV sync failed: check username and password</string>
     <string name="sync_result_path_error">WebDAV sync failed: check WebDAV path and permissions</string>
     <string name="sync_result_remote_not_found">WebDAV snapshot was not found. Sync once to create mi-notes-sync.json, or check the path.</string>
+    <string name="sync_result_backup_error">WebDAV sync failed: backup could not be created, so existing data was not changed</string>
     <!-- Preferences -->
     <string name="preferences_title">Settings</string>
     <string name="preferences_account_title">Sync account</string>

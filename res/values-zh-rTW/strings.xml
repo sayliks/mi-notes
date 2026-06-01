@@ -109,6 +109,7 @@
     <string name="sync_result_auth_error">WebDAV 同步失敗：請檢查使用者名稱和密碼</string>
     <string name="sync_result_path_error">WebDAV 同步失敗：請檢查 WebDAV 路徑和權限</string>
     <string name="sync_result_remote_not_found">未找到 WebDAV 快照。請同步一次以建立 mi-notes-sync.json，或檢查路徑。</string>
+    <string name="sync_result_backup_error">WebDAV 同步失敗：無法建立備份，現有資料未被變更</string>
     <!-- Preferences -->
     <string name="preferences_title">設置</string>
     <string name="preferences_account_title">同步賬號</string>
