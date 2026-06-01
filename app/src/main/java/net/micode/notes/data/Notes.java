@@ -41,6 +41,7 @@ public class Notes {
     public static final String INTENT_EXTRA_WIDGET_TYPE = "net.micode.notes.widget_type";
     public static final String INTENT_EXTRA_FOLDER_ID = "net.micode.notes.folder_id";
     public static final String INTENT_EXTRA_CALL_DATE = "net.micode.notes.call_date";
+    public static final String INTENT_EXTRA_ROOM_NOTE_ID = "net.micode.notes.room_note_id";
 
     public static final int TYPE_WIDGET_INVALIDE      = -1;
     public static final int TYPE_WIDGET_2X            = 0;
