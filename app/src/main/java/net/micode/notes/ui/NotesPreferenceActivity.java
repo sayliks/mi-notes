@@ -27,12 +27,15 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.text.InputType;
 import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,7 +51,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
-import net.micode.notes.gtask.remote.GTaskSyncService;
+import net.micode.notes.sync.webdav.WebDavSyncService;
 
 
 public class NotesPreferenceActivity extends AppCompatActivity {
@@ -57,6 +60,12 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     public static final String PREFERENCE_NAME = "notes_preferences";
 
     public static final String PREFERENCE_SYNC_ACCOUNT_NAME = "pref_key_account_name";
+
+    public static final String PREFERENCE_WEBDAV_URL = "pref_key_webdav_url";
+
+    public static final String PREFERENCE_WEBDAV_USERNAME = "pref_key_webdav_username";
+
+    public static final String PREFERENCE_WEBDAV_PASSWORD = "pref_key_webdav_password";
 
     public static final String PREFERENCE_LAST_SYNC_TIME = "pref_last_sync_time";
 
@@ -93,7 +102,7 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
         mReceiver = new GTaskReceiver();
         IntentFilter filter = new IntentFilter();
-        filter.addAction(GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME);
+        filter.addAction(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_NAME);
         ContextCompat.registerReceiver(this, mReceiver, filter,
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         mReceiverRegistered = true;
@@ -104,28 +113,6 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
-        // need to set sync account automatically if user has added a new
-        // account
-        if (mHasAddedAccount) {
-            Account[] accounts = getGoogleAccounts();
-            if (mOriAccounts != null && accounts.length > mOriAccounts.length) {
-                for (Account accountNew : accounts) {
-                    boolean found = false;
-                    for (Account accountOld : mOriAccounts) {
-                        if (TextUtils.equals(accountOld.name, accountNew.name)) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        setSyncAccount(accountNew.name);
-                        break;
-                    }
-                }
-            }
-        }
-
         refreshUI();
     }
 
@@ -153,23 +140,18 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         accountCategory.removeAll();
 
         Preference accountPref = new Preference(this);
-        final String defaultAccount = getSyncAccountName(this);
-        accountPref.setTitle(getString(R.string.preferences_account_title));
-        accountPref.setSummary(getString(R.string.preferences_account_summary));
+        accountPref.setTitle(getString(R.string.preferences_webdav_title));
+        String webDavUrl = getWebDavUrl(this);
+        accountPref.setSummary(TextUtils.isEmpty(webDavUrl)
+                ? getString(R.string.preferences_webdav_summary_not_configured)
+                : webDavUrl);
         accountPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             public boolean onPreferenceClick(Preference preference) {
-                if (!GTaskSyncService.isSyncing()) {
-                    if (TextUtils.isEmpty(defaultAccount)) {
-                        // the first time to set account
-                        showSelectAccountAlertDialog();
-                    } else {
-                        // if the account has already been set, we need to promp
-                        // user about the risk
-                        showChangeAccountConfirmAlertDialog();
-                    }
+                if (!WebDavSyncService.isSyncing()) {
+                    showWebDavSettingsDialog();
                 } else {
                     Toast.makeText(NotesPreferenceActivity.this,
-                            R.string.preferences_toast_cannot_change_account, Toast.LENGTH_SHORT)
+                            R.string.preferences_toast_cannot_change_sync_settings, Toast.LENGTH_SHORT)
                             .show();
                 }
                 return true;
@@ -184,26 +166,26 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         TextView lastSyncTimeView = (TextView) findViewById(R.id.prefenerece_sync_status_textview);
 
         // set button state
-        if (GTaskSyncService.isSyncing()) {
+        if (WebDavSyncService.isSyncing()) {
             syncButton.setText(getString(R.string.preferences_button_sync_cancel));
             syncButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    GTaskSyncService.cancelSync(NotesPreferenceActivity.this);
+                    WebDavSyncService.cancelSync(NotesPreferenceActivity.this);
                 }
             });
         } else {
             syncButton.setText(getString(R.string.preferences_button_sync_immediately));
             syncButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    GTaskSyncService.startSync(NotesPreferenceActivity.this);
+                    WebDavSyncService.startSync(NotesPreferenceActivity.this);
                 }
             });
         }
-        syncButton.setEnabled(!TextUtils.isEmpty(getSyncAccountName(this)));
+        syncButton.setEnabled(isSyncConfigured(this));
 
         // set last sync time
-        if (GTaskSyncService.isSyncing()) {
-            lastSyncTimeView.setText(GTaskSyncService.getProgressString());
+        if (WebDavSyncService.isSyncing()) {
+            lastSyncTimeView.setText(WebDavSyncService.getProgressString());
             lastSyncTimeView.setVisibility(View.VISIBLE);
         } else {
             long lastSyncTime = getLastSyncTime(this);
@@ -221,6 +203,48 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     private void refreshUI() {
         loadAccountPreference();
         loadSyncButton();
+    }
+
+    private void showWebDavSettingsDialog() {
+        final EditText urlInput = new EditText(this);
+        urlInput.setSingleLine(true);
+        urlInput.setHint(R.string.preferences_webdav_url_hint);
+        urlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        urlInput.setText(getWebDavUrl(this));
+
+        final EditText userInput = new EditText(this);
+        userInput.setSingleLine(true);
+        userInput.setHint(R.string.preferences_webdav_username_hint);
+        userInput.setText(getWebDavUserName(this));
+
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.preferences_webdav_password_hint);
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passwordInput.setText(getWebDavPassword(this));
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(urlInput);
+        container.addView(userInput);
+        container.addView(passwordInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.preferences_webdav_dialog_title)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        setWebDavConfig(urlInput.getText().toString(),
+                                userInput.getText().toString(),
+                                passwordInput.getText().toString());
+                        refreshUI();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void showSelectAccountAlertDialog() {
@@ -380,6 +404,37 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         return settings.getString(PREFERENCE_SYNC_ACCOUNT_NAME, "");
     }
 
+    public static String getWebDavUrl(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_URL, "");
+    }
+
+    public static String getWebDavUserName(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_USERNAME, "");
+    }
+
+    public static String getWebDavPassword(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return settings.getString(PREFERENCE_WEBDAV_PASSWORD, "");
+    }
+
+    public static boolean isSyncConfigured(Context context) {
+        return !TextUtils.isEmpty(getWebDavUrl(context).trim());
+    }
+
+    private void setWebDavConfig(String url, String userName, String password) {
+        SharedPreferences settings = getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PREFERENCE_WEBDAV_URL, url == null ? "" : url.trim());
+        editor.putString(PREFERENCE_WEBDAV_USERNAME, userName == null ? "" : userName.trim());
+        editor.putString(PREFERENCE_WEBDAV_PASSWORD, password == null ? "" : password);
+        editor.commit();
+    }
+
     public static void setLastSyncTime(Context context, long time) {
         SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
                 Context.MODE_PRIVATE);
@@ -417,10 +472,10 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             refreshUI();
-            if (intent.getBooleanExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_IS_SYNCING, false)) {
+            if (intent.getBooleanExtra(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_IS_SYNCING, false)) {
                 TextView syncStatus = (TextView) findViewById(R.id.prefenerece_sync_status_textview);
                 syncStatus.setText(intent
-                        .getStringExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_PROGRESS_MSG));
+                        .getStringExtra(WebDavSyncService.WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG));
             }
 
         }

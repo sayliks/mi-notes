@@ -96,10 +96,19 @@
     <string name="sync_progress_login">Logging into %1$s...</string>
     <string name="sync_progress_init_list">Getting remote note list...</string>
     <string name="sync_progress_syncing">Synchronize local notes with Google Task...</string>
+    <string name="sync_progress_webdav_connecting">Connecting to WebDAV...</string>
+    <string name="sync_progress_webdav_downloading">Downloading notes from WebDAV...</string>
+    <string name="sync_progress_webdav_uploading">Uploading notes to WebDAV...</string>
     <!-- Preferences -->
     <string name="preferences_title">Settings</string>
     <string name="preferences_account_title">Sync account</string>
     <string name="preferences_account_summary">Sync notes with google task</string>
+    <string name="preferences_webdav_title">WebDAV sync</string>
+    <string name="preferences_webdav_summary_not_configured">Set a WebDAV folder or JSON file URL</string>
+    <string name="preferences_webdav_dialog_title">WebDAV settings</string>
+    <string name="preferences_webdav_url_hint">WebDAV URL</string>
+    <string name="preferences_webdav_username_hint">Username</string>
+    <string name="preferences_webdav_password_hint">Password</string>
     <string name="preferences_last_sync_time">Last sync time %1$s</string>
     <string name="preferences_last_sync_time_format">yyyy-MM-dd hh:mm:ss</string>
     <string name="preferences_add_account">Add account</string>
@@ -113,6 +122,7 @@
     <string name="preferences_dialog_select_account_title">Sync notes</string>
     <string name="preferences_dialog_select_account_tips">Please select a google account. Local notes will be synced with google task.</string>
     <string name="preferences_toast_cannot_change_account">Cannot change the account because sync is in progress</string>
+    <string name="preferences_toast_cannot_change_sync_settings">Cannot change sync settings because sync is in progress</string>
     <string name="preferences_toast_success_set_accout">%1$s has been set as the sync account</string>
     <string name="preferences_bg_random_appear_title">New note background color random</string>
 
