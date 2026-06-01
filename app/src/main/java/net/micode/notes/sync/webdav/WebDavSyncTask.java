@@ -18,21 +18,35 @@ package net.micode.notes.sync.webdav;
 
 import android.content.Context;
 import android.os.AsyncTask;
+import android.text.TextUtils;
+import android.widget.Toast;
+
+import net.micode.notes.ui.NotesPreferenceActivity;
+
+import java.lang.ref.WeakReference;
 
 public class WebDavSyncTask extends AsyncTask<Void, String, Integer> {
     public interface OnCompleteListener {
-        void onComplete();
+        void onComplete(int result);
     }
 
-    private final Context mContext;
+    public interface OnProgressListener {
+        void onProgress(String message);
+    }
+
+    private final WeakReference<Context> mContextRef;
+
+    private final OnProgressListener mOnProgressListener;
 
     private final OnCompleteListener mOnCompleteListener;
 
     private final WebDavSyncManager mSyncManager;
 
-    WebDavSyncTask(Context context, OnCompleteListener listener) {
-        mContext = context;
-        mOnCompleteListener = listener;
+    WebDavSyncTask(Context context, OnProgressListener progressListener,
+            OnCompleteListener completeListener) {
+        mContextRef = new WeakReference<Context>(context.getApplicationContext());
+        mOnProgressListener = progressListener;
+        mOnCompleteListener = completeListener;
         mSyncManager = WebDavSyncManager.getInstance();
     }
 
@@ -46,29 +60,46 @@ public class WebDavSyncTask extends AsyncTask<Void, String, Integer> {
 
     @Override
     protected Integer doInBackground(Void... unused) {
-        return mSyncManager.sync(mContext, this);
+        Context context = mContextRef.get();
+        if (context == null) {
+            return WebDavSyncManager.STATE_INTERNAL_ERROR;
+        }
+        return mSyncManager.sync(context, this);
     }
 
     @Override
     protected void onProgressUpdate(String... progress) {
-        if (mContext instanceof WebDavSyncService && progress.length > 0) {
-            ((WebDavSyncService) mContext).sendBroadcast(progress[0]);
+        if (mOnProgressListener != null && progress.length > 0) {
+            mOnProgressListener.onProgress(progress[0]);
         }
     }
 
     @Override
     protected void onPostExecute(Integer result) {
-        notifyComplete();
+        showResult(result);
+        notifyComplete(result);
     }
 
     @Override
     protected void onCancelled(Integer result) {
-        notifyComplete();
+        showResult(result);
+        notifyComplete(result);
     }
 
-    private void notifyComplete() {
+    private void showResult(Integer result) {
+        Context context = mContextRef.get();
+        if (context != null) {
+            String message = NotesPreferenceActivity.getLastSyncResultMessage(context);
+            if (!TextUtils.isEmpty(message)) {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void notifyComplete(Integer result) {
         if (mOnCompleteListener != null) {
-            mOnCompleteListener.onComplete();
+            mOnCompleteListener.onComplete(result == null
+                    ? WebDavSyncManager.STATE_INTERNAL_ERROR : result);
         }
     }
 }

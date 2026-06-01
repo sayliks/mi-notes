@@ -51,6 +51,16 @@ public class WebDavSyncManager {
 
     public static final int STATE_NOT_CONFIGURED = 5;
 
+    public static final int STATE_INVALID_SNAPSHOT = 6;
+
+    public static final int STATE_AUTH_ERROR = 7;
+
+    public static final int STATE_PATH_ERROR = 8;
+
+    public static final int STATE_INVALID_URL = 9;
+
+    public static final int STATE_REMOTE_NOT_FOUND = 10;
+
     private static final String JSON_VERSION = "version";
 
     private static final String JSON_GENERATED_AT = "generated_at";
@@ -166,7 +176,9 @@ public class WebDavSyncManager {
 
         try {
             String url = NotesPreferenceActivity.getWebDavUrl(context);
-            if (TextUtils.isEmpty(url)) {
+            if (TextUtils.isEmpty(url == null ? "" : url.trim())) {
+                NotesPreferenceActivity.setLastSyncResult(context, STATE_NOT_CONFIGURED,
+                        context.getString(R.string.sync_result_not_configured));
                 return STATE_NOT_CONFIGURED;
             }
 
@@ -177,6 +189,8 @@ public class WebDavSyncManager {
             asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_connecting));
             String remotePayload = client.getSnapshot();
             if (mCancelled) {
+                NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
+                        context.getString(R.string.sync_result_cancelled));
                 return STATE_SYNC_CANCELLED;
             }
 
@@ -193,31 +207,155 @@ public class WebDavSyncManager {
 
             if (remoteSnapshot != null && remoteGeneratedAt > lastSyncTime && !localChanged) {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_downloading));
+                backupLocalSnapshot(context, client);
+                if (mCancelled) {
+                    NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
+                            context.getString(R.string.sync_result_cancelled));
+                    return STATE_SYNC_CANCELLED;
+                }
                 importSnapshot(context, remoteSnapshot);
+                NotesPreferenceActivity.setLastSyncResult(context, STATE_SUCCESS,
+                        context.getString(R.string.sync_result_downloaded_remote));
             } else {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_uploading));
+                backupRemoteSnapshot(client, remotePayload);
                 JSONObject localSnapshot = exportSnapshot(context);
+                if (mCancelled) {
+                    NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
+                            context.getString(R.string.sync_result_cancelled));
+                    return STATE_SYNC_CANCELLED;
+                }
                 client.putSnapshot(localSnapshot.toString());
                 cleanupTrash(context);
                 resetLocalModified(context);
+                int messageResId = remoteSnapshot != null && remoteGeneratedAt > lastSyncTime
+                        && localChanged ? R.string.sync_result_uploaded_local_conflict
+                        : R.string.sync_result_uploaded_local;
+                NotesPreferenceActivity.setLastSyncResult(context, STATE_SUCCESS,
+                        context.getString(messageResId));
             }
 
+            if (mCancelled) {
+                NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
+                        context.getString(R.string.sync_result_cancelled));
+                return STATE_SYNC_CANCELLED;
+            }
             NotesPreferenceActivity.setLastSyncTime(context, System.currentTimeMillis());
-            return mCancelled ? STATE_SYNC_CANCELLED : STATE_SUCCESS;
+            return STATE_SUCCESS;
+        } catch (WebDavClient.WebDavException e) {
+            Log.e(TAG, "WebDAV protocol error", e);
+            int state = mapWebDavError(e);
+            NotesPreferenceActivity.setLastSyncResult(context, state,
+                    context.getString(getResultMessageResId(state)));
+            return state;
         } catch (IOException e) {
             Log.e(TAG, "WebDAV network error", e);
+            NotesPreferenceActivity.setLastSyncResult(context, STATE_NETWORK_ERROR,
+                    context.getString(R.string.sync_result_network_error));
             return STATE_NETWORK_ERROR;
         } catch (JSONException e) {
             Log.e(TAG, "WebDAV snapshot error", e);
-            return STATE_INTERNAL_ERROR;
+            NotesPreferenceActivity.setLastSyncResult(context, STATE_INVALID_SNAPSHOT,
+                    context.getString(R.string.sync_result_invalid_snapshot));
+            return STATE_INVALID_SNAPSHOT;
         } catch (RuntimeException e) {
             Log.e(TAG, "WebDAV sync failed", e);
+            NotesPreferenceActivity.setLastSyncResult(context, STATE_INTERNAL_ERROR,
+                    context.getString(R.string.sync_result_internal_error));
             return STATE_INTERNAL_ERROR;
         } finally {
             synchronized (this) {
                 mSyncing = false;
             }
         }
+    }
+
+    public int testConnection(Context context) {
+        String url = NotesPreferenceActivity.getWebDavUrl(context);
+        if (TextUtils.isEmpty(url == null ? "" : url.trim())) {
+            return STATE_NOT_CONFIGURED;
+        }
+
+        try {
+            WebDavClient client = new WebDavClient(url,
+                    NotesPreferenceActivity.getWebDavUserName(context),
+                    NotesPreferenceActivity.getWebDavPassword(context));
+            String remotePayload = client.testSnapshot();
+            if (!TextUtils.isEmpty(remotePayload)) {
+                validateSnapshot(new JSONObject(remotePayload));
+            }
+            return STATE_SUCCESS;
+        } catch (WebDavClient.WebDavException e) {
+            Log.e(TAG, "WebDAV test failed", e);
+            return mapWebDavError(e);
+        } catch (IOException e) {
+            Log.e(TAG, "WebDAV test network error", e);
+            return STATE_NETWORK_ERROR;
+        } catch (JSONException e) {
+            Log.e(TAG, "WebDAV test snapshot error", e);
+            return STATE_INVALID_SNAPSHOT;
+        } catch (RuntimeException e) {
+            Log.e(TAG, "WebDAV test failed", e);
+            return STATE_INTERNAL_ERROR;
+        }
+    }
+
+    public static int getResultMessageResId(int state) {
+        switch (state) {
+            case STATE_SUCCESS:
+                return R.string.sync_result_success;
+            case STATE_NETWORK_ERROR:
+                return R.string.sync_result_network_error;
+            case STATE_INTERNAL_ERROR:
+                return R.string.sync_result_internal_error;
+            case STATE_SYNC_IN_PROGRESS:
+                return R.string.sync_result_in_progress;
+            case STATE_SYNC_CANCELLED:
+                return R.string.sync_result_cancelled;
+            case STATE_NOT_CONFIGURED:
+                return R.string.sync_result_not_configured;
+            case STATE_INVALID_SNAPSHOT:
+                return R.string.sync_result_invalid_snapshot;
+            case STATE_AUTH_ERROR:
+                return R.string.sync_result_auth_error;
+            case STATE_PATH_ERROR:
+                return R.string.sync_result_path_error;
+            case STATE_INVALID_URL:
+                return R.string.sync_result_invalid_url;
+            case STATE_REMOTE_NOT_FOUND:
+                return R.string.sync_result_remote_not_found;
+            default:
+                return R.string.sync_result_internal_error;
+        }
+    }
+
+    private int mapWebDavError(WebDavClient.WebDavException e) {
+        switch (e.getErrorCode()) {
+            case WebDavClient.ERROR_INVALID_URL:
+                return STATE_INVALID_URL;
+            case WebDavClient.ERROR_AUTH:
+                return STATE_AUTH_ERROR;
+            case WebDavClient.ERROR_FORBIDDEN:
+            case WebDavClient.ERROR_PATH:
+                return STATE_PATH_ERROR;
+            case WebDavClient.ERROR_REMOTE_NOT_FOUND:
+                return STATE_REMOTE_NOT_FOUND;
+            default:
+                return STATE_NETWORK_ERROR;
+        }
+    }
+
+    private void backupRemoteSnapshot(WebDavClient client, String remotePayload)
+            throws IOException {
+        if (!TextUtils.isEmpty(remotePayload)) {
+            client.putBackupSnapshot(remotePayload, System.currentTimeMillis());
+        }
+    }
+
+    private void backupLocalSnapshot(Context context, WebDavClient client)
+            throws IOException, JSONException {
+        client.putBackupSnapshot(exportSnapshot(context, true).toString(),
+                System.currentTimeMillis());
     }
 
     private boolean hasLocalChanges(Context context) {
@@ -244,6 +382,10 @@ public class WebDavSyncManager {
     }
 
     private JSONObject exportSnapshot(Context context) throws JSONException {
+        return exportSnapshot(context, false);
+    }
+
+    private JSONObject exportSnapshot(Context context, boolean includeTrash) throws JSONException {
         JSONObject snapshot = new JSONObject();
         snapshot.put(JSON_VERSION, 1);
         snapshot.put(JSON_GENERATED_AT, System.currentTimeMillis());
@@ -252,9 +394,14 @@ public class WebDavSyncManager {
         HashSet<Long> exportedNoteIds = new HashSet<Long>();
         Cursor noteCursor = null;
         try {
+            String selection = NoteColumns.ID + ">0";
+            String[] selectionArgs = null;
+            if (!includeTrash) {
+                selection += " AND " + NoteColumns.PARENT_ID + "<>?";
+                selectionArgs = new String[] { String.valueOf(Notes.ID_TRASH_FOLER) };
+            }
             noteCursor = context.getContentResolver().query(Notes.CONTENT_NOTE_URI, NOTE_PROJECTION,
-                    NoteColumns.ID + ">0 AND " + NoteColumns.PARENT_ID + "<>?",
-                    new String[] { String.valueOf(Notes.ID_TRASH_FOLER) },
+                    selection, selectionArgs,
                     NoteColumns.TYPE + " DESC," + NoteColumns.ID + " ASC");
             if (noteCursor != null) {
                 while (noteCursor.moveToNext()) {

@@ -42,20 +42,30 @@ public class WebDavSyncService extends Service {
 
     public static final String WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG = "progressMsg";
 
-    private static WebDavSyncTask mSyncTask;
+    public static final String WEBDAV_SERVICE_BROADCAST_RESULT = "result";
+
+    private static boolean mSyncRequested;
 
     private static String mSyncProgress = "";
 
+    private WebDavSyncTask mSyncTask;
+
     private void startSync() {
-        if (mSyncTask == null) {
-            mSyncTask = new WebDavSyncTask(this, new WebDavSyncTask.OnCompleteListener() {
-                public void onComplete() {
+        if (!isSyncing()) {
+            mSyncRequested = true;
+            mSyncTask = new WebDavSyncTask(this, new WebDavSyncTask.OnProgressListener() {
+                public void onProgress(String message) {
+                    sendBroadcast(message);
+                }
+            }, new WebDavSyncTask.OnCompleteListener() {
+                public void onComplete(int result) {
                     mSyncTask = null;
-                    sendBroadcast("");
+                    mSyncRequested = false;
+                    sendBroadcast("", result);
                     stopSelf();
                 }
             });
-            sendBroadcast("");
+            sendBroadcast("", WebDavSyncManager.STATE_SYNC_IN_PROGRESS);
             mSyncTask.execute();
         }
     }
@@ -63,6 +73,8 @@ public class WebDavSyncService extends Service {
     private void cancelSync() {
         if (mSyncTask != null) {
             mSyncTask.cancelSync();
+        } else if (WebDavSyncManager.getInstance().isSyncing()) {
+            WebDavSyncManager.getInstance().cancelSync();
         }
     }
 
@@ -94,11 +106,16 @@ public class WebDavSyncService extends Service {
     }
 
     public void sendBroadcast(String msg) {
+        sendBroadcast(msg, WebDavSyncManager.STATE_SYNC_IN_PROGRESS);
+    }
+
+    public void sendBroadcast(String msg, int result) {
         mSyncProgress = msg;
         Intent intent = new Intent(WEBDAV_SERVICE_BROADCAST_NAME);
         intent.setPackage(getPackageName());
-        intent.putExtra(WEBDAV_SERVICE_BROADCAST_IS_SYNCING, mSyncTask != null);
+        intent.putExtra(WEBDAV_SERVICE_BROADCAST_IS_SYNCING, isSyncing());
         intent.putExtra(WEBDAV_SERVICE_BROADCAST_PROGRESS_MSG, msg);
+        intent.putExtra(WEBDAV_SERVICE_BROADCAST_RESULT, result);
         sendBroadcast(intent);
     }
 
@@ -123,7 +140,7 @@ public class WebDavSyncService extends Service {
     }
 
     public static boolean isSyncing() {
-        return mSyncTask != null || WebDavSyncManager.getInstance().isSyncing();
+        return mSyncRequested || WebDavSyncManager.getInstance().isSyncing();
     }
 
     public static String getProgressString() {
