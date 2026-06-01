@@ -24,10 +24,24 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 class WebDavClient {
+    static final int ERROR_INVALID_URL = 0;
+
+    static final int ERROR_AUTH = 1;
+
+    static final int ERROR_FORBIDDEN = 2;
+
+    static final int ERROR_PATH = 3;
+
+    static final int ERROR_SERVER = 4;
+
+    static final int ERROR_REMOTE_NOT_FOUND = 5;
+
     private static final int CONNECT_TIMEOUT_MS = 15000;
 
     private static final int READ_TIMEOUT_MS = 30000;
@@ -47,15 +61,27 @@ class WebDavClient {
     }
 
     String getSnapshot() throws IOException {
+        return getSnapshot(true);
+    }
+
+    String testSnapshot() throws IOException {
+        return getSnapshot(false);
+    }
+
+    private String getSnapshot(boolean allowMissingSnapshot) throws IOException {
         HttpURLConnection connection = openConnection("GET");
         try {
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                return null;
+                if (allowMissingSnapshot) {
+                    return null;
+                }
+                throw new WebDavException(ERROR_REMOTE_NOT_FOUND,
+                        "GET failed: " + responseCode);
             }
             if (responseCode < HttpURLConnection.HTTP_OK
                     || responseCode >= HttpURLConnection.HTTP_MULT_CHOICE) {
-                throw new IOException("GET failed: " + responseCode);
+                throwForResponse("GET", responseCode);
             }
             BufferedInputStream input = new BufferedInputStream(connection.getInputStream());
             try {
@@ -75,7 +101,15 @@ class WebDavClient {
     }
 
     void putSnapshot(String snapshot) throws IOException {
-        HttpURLConnection connection = openConnection("PUT");
+        putJson(getSnapshotUrl(), snapshot);
+    }
+
+    void putBackupSnapshot(String snapshot, long timestamp) throws IOException {
+        putJson(getBackupUrl(timestamp), snapshot);
+    }
+
+    private void putJson(URL url, String snapshot) throws IOException {
+        HttpURLConnection connection = openConnection("PUT", url);
         connection.setDoOutput(true);
         byte[] payload = snapshot.getBytes(StandardCharsets.UTF_8);
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
@@ -91,7 +125,7 @@ class WebDavClient {
             int responseCode = connection.getResponseCode();
             if (responseCode < HttpURLConnection.HTTP_OK
                     || responseCode >= HttpURLConnection.HTTP_MULT_CHOICE) {
-                throw new IOException("PUT failed: " + responseCode);
+                throwForResponse("PUT", responseCode);
             }
         } finally {
             connection.disconnect();
@@ -99,7 +133,16 @@ class WebDavClient {
     }
 
     private HttpURLConnection openConnection(String method) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) getSnapshotUrl().openConnection();
+        return openConnection(method, getSnapshotUrl());
+    }
+
+    private HttpURLConnection openConnection(String method, URL url) throws IOException {
+        if (!"http".equalsIgnoreCase(url.getProtocol())
+                && !"https".equalsIgnoreCase(url.getProtocol())) {
+            throw new WebDavException(ERROR_INVALID_URL,
+                    "Unsupported WebDAV URL scheme: " + url.getProtocol());
+        }
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(READ_TIMEOUT_MS);
         connection.setRequestMethod(method);
@@ -116,12 +159,65 @@ class WebDavClient {
 
     private URL getSnapshotUrl() throws IOException {
         String trimmedUrl = mUrl == null ? "" : mUrl.trim();
-        if (trimmedUrl.endsWith(".json")) {
-            return new URL(trimmedUrl);
+        try {
+            if (trimmedUrl.toLowerCase(Locale.US).endsWith(".json")) {
+                return new URL(trimmedUrl);
+            }
+            if (!trimmedUrl.endsWith("/")) {
+                trimmedUrl += "/";
+            }
+            return new URL(trimmedUrl + SNAPSHOT_FILE_NAME);
+        } catch (MalformedURLException e) {
+            throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
         }
-        if (!trimmedUrl.endsWith("/")) {
-            trimmedUrl += "/";
+    }
+
+    private URL getBackupUrl(long timestamp) throws IOException {
+        String trimmedUrl = mUrl == null ? "" : mUrl.trim();
+        String backupSuffix = ".backup-" + timestamp + ".json";
+        try {
+            if (trimmedUrl.toLowerCase(Locale.US).endsWith(".json")) {
+                int slashIndex = trimmedUrl.lastIndexOf('/');
+                String parent = slashIndex >= 0 ? trimmedUrl.substring(0, slashIndex + 1) : "";
+                String fileName = slashIndex >= 0 ? trimmedUrl.substring(slashIndex + 1)
+                        : trimmedUrl;
+                return new URL(parent + fileName.substring(0, fileName.length() - 5)
+                        + backupSuffix);
+            }
+            if (!trimmedUrl.endsWith("/")) {
+                trimmedUrl += "/";
+            }
+            return new URL(trimmedUrl + SNAPSHOT_FILE_NAME.substring(0,
+                    SNAPSHOT_FILE_NAME.length() - 5) + backupSuffix);
+        } catch (MalformedURLException e) {
+            throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
         }
-        return new URL(trimmedUrl + SNAPSHOT_FILE_NAME);
+    }
+
+    private void throwForResponse(String method, int responseCode) throws IOException {
+        if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+            throw new WebDavException(ERROR_AUTH, method + " failed: " + responseCode);
+        }
+        if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+            throw new WebDavException(ERROR_FORBIDDEN, method + " failed: " + responseCode);
+        }
+        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND
+                || responseCode == HttpURLConnection.HTTP_CONFLICT) {
+            throw new WebDavException(ERROR_PATH, method + " failed: " + responseCode);
+        }
+        throw new WebDavException(ERROR_SERVER, method + " failed: " + responseCode);
+    }
+
+    static class WebDavException extends IOException {
+        private final int mErrorCode;
+
+        WebDavException(int errorCode, String message) {
+            super(message);
+            mErrorCode = errorCode;
+        }
+
+        int getErrorCode() {
+            return mErrorCode;
+        }
     }
 }
