@@ -19,17 +19,17 @@ package net.micode.notes.ui;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.os.Build;
+import android.util.Log;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
 
 
 public class AlarmInitReceiver extends BroadcastReceiver {
+    private static final String TAG = "AlarmInitReceiver";
 
     private static final String [] PROJECTION = new String [] {
         NoteColumns.ID,
@@ -41,31 +41,40 @@ public class AlarmInitReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        rescheduleAlarms(context);
+    }
+
+    public static int rescheduleAlarms(Context context) {
         long currentDate = System.currentTimeMillis();
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) {
+            Log.e(TAG, "Alarm service is unavailable");
+            return 0;
+        }
+
         Cursor c = context.getContentResolver().query(Notes.CONTENT_NOTE_URI,
                 PROJECTION,
                 NoteColumns.ALERTED_DATE + ">? AND " + NoteColumns.TYPE + "=" + Notes.TYPE_NOTE,
                 new String[] { String.valueOf(currentDate) },
                 null);
 
+        int scheduledCount = 0;
         if (c != null) {
-            if (c.moveToFirst()) {
-                do {
-                    long alertDate = c.getLong(COLUMN_ALERTED_DATE);
-                    Intent sender = new Intent(context, AlarmReceiver.class);
-                    sender.setData(ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, c.getLong(COLUMN_ID)));
-                    int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
-                    }
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, sender,
-                            pendingIntentFlags);
-                    AlarmManager alermManager = (AlarmManager) context
-                            .getSystemService(Context.ALARM_SERVICE);
-                    alermManager.set(AlarmManager.RTC_WAKEUP, alertDate, pendingIntent);
-                } while (c.moveToNext());
+            try {
+                if (c.moveToFirst()) {
+                    do {
+                        long alertDate = c.getLong(COLUMN_ALERTED_DATE);
+                        long noteId = c.getLong(COLUMN_ID);
+                        PendingIntent pendingIntent =
+                                AlarmReceiver.createPendingIntent(context, noteId);
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, alertDate, pendingIntent);
+                        scheduledCount++;
+                    } while (c.moveToNext());
+                }
+            } finally {
+                c.close();
             }
-            c.close();
         }
+        return scheduledCount;
     }
 }

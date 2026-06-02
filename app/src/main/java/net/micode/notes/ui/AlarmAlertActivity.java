@@ -30,6 +30,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -41,6 +42,8 @@ import java.io.IOException;
 
 
 public class AlarmAlertActivity extends AppCompatActivity implements OnClickListener, OnDismissListener {
+    private static final String TAG = "AlarmAlertActivity";
+
     private long mNoteId;
     private String mSnippet;
     private static final int SNIPPET_PREW_MAX_LEN = 60;
@@ -61,16 +64,24 @@ public class AlarmAlertActivity extends AppCompatActivity implements OnClickList
                     | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR);
         }
 
-        Intent intent = getIntent();
+        mNoteId = AlarmReceiver.getNoteId(getIntent());
+        if (mNoteId == AlarmReceiver.INVALID_NOTE_ID) {
+            Log.e(TAG, "Alarm alert launched without a valid provider note id");
+            finish();
+            return;
+        }
 
         try {
-            mNoteId = Long.valueOf(intent.getData().getPathSegments().get(1));
             mSnippet = DataUtils.getSnippetById(this.getContentResolver(), mNoteId);
+            if (mSnippet == null) {
+                mSnippet = "";
+            }
             mSnippet = mSnippet.length() > SNIPPET_PREW_MAX_LEN ? mSnippet.substring(0,
                     SNIPPET_PREW_MAX_LEN) + getResources().getString(R.string.notelist_string_info)
                     : mSnippet;
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Alarm note is not available: " + mNoteId, e);
+            finish();
             return;
         }
 
