@@ -4,6 +4,7 @@ import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Delete;
 import androidx.room.Insert;
+import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 import androidx.room.Update;
 import net.micode.notes.data.entity.NoteEntity;
@@ -18,6 +19,9 @@ public interface NoteDao {
     // 便签 CRUD
     @Insert
     long insert(NoteEntity note);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insertAll(List<NoteEntity> notes);
 
     @Update
     int update(NoteEntity note);
@@ -45,9 +49,14 @@ public interface NoteDao {
     @Query("SELECT * FROM note WHERE id = :id")
     LiveData<NoteEntity> getNoteById(long id);
 
-    // 同步获取单个便签（供编辑页加载）
-    @Query("SELECT * FROM note WHERE id = :id")
-    NoteEntity getNoteByIdSync(long id);
+    @Query("SELECT * FROM note")
+    List<NoteEntity> getAllNotesSync();
+
+    @Query("SELECT COUNT(*) FROM note")
+    int getCountSync();
+
+    @Query("DELETE FROM note")
+    void deleteAllNotes();
 
     // 软删除
     @Query("UPDATE note SET is_deleted = 1, modified_date = :deleteTime WHERE id = :noteId")

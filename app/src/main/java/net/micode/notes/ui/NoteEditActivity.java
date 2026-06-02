@@ -57,9 +57,6 @@ import android.widget.Toast;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.TextNote;
-import net.micode.notes.data.dao.NoteDao;
-import net.micode.notes.data.database.NotesDatabase;
-import net.micode.notes.data.entity.NoteEntity;
 import net.micode.notes.model.WorkingNote;
 import net.micode.notes.model.WorkingNote.NoteSettingChangedListener;
 import net.micode.notes.tool.DataUtils;
@@ -154,11 +151,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     private String mUserQuery;
     private Pattern mPattern;
 
-    // Room mode fields
-    private boolean mRoomMode = false;
-    private NoteEntity mRoomNote;
-    private NoteDao mNoteDao;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -181,9 +173,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         if (savedInstanceState != null && savedInstanceState.containsKey(Intent.EXTRA_UID)) {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.putExtra(Intent.EXTRA_UID, savedInstanceState.getLong(Intent.EXTRA_UID));
-            if (savedInstanceState.getBoolean(Notes.INTENT_EXTRA_ROOM_NOTE_ID, false)) {
-                intent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, true);
-            }
             if (!initActivityState(intent)) {
                 finish();
                 return;
@@ -198,25 +187,14 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
          * then jump to the NotesListActivity
          */
         mWorkingNote = null;
-        mRoomMode = false;
 
         if (TextUtils.equals(Intent.ACTION_VIEW, intent.getAction())) {
             long noteId = intent.getLongExtra(Intent.EXTRA_UID, 0);
 
-            // Room mode: if EXTRA_ROOM_NOTE_ID is set, load from Room
+            // Migration stage: provider remains authoritative. Room-only edit mode is disabled
+            // so editing, WebDAV sync, widgets, alarms, and search all see the same note rows.
             if (intent.hasExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID)) {
-                if (mNoteDao == null) {
-                    mNoteDao = NotesDatabase.getInstance(this).noteDao();
-                }
-                mRoomNote = mNoteDao.getNoteByIdSync(noteId);
-                if (mRoomNote != null) {
-                    mRoomMode = true;
-                    mUserQuery = "";
-                    getWindow().setSoftInputMode(
-                            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-                                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-                    return true;
-                }
+                Log.d(TAG, "Ignoring Room note extra during provider-authoritative migration");
             }
             mUserQuery = "";
 
@@ -280,6 +258,9 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
                 mWorkingNote = WorkingNote.createEmptyNote(this, folderId, widgetId, widgetType,
                         bgResId);
             }
+            if (intent.getBooleanExtra(Notes.INTENT_EXTRA_CHECKLIST_MODE, false)) {
+                mWorkingNote.setCheckListMode(TextNote.MODE_CHECK_LIST);
+            }
 
             getWindow().setSoftInputMode(
                     WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
@@ -300,10 +281,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     }
 
     private void initNoteScreen() {
-        if (mRoomMode && mRoomNote != null) {
-            initRoomNoteScreen();
-            return;
-        }
         mNoteEditor.setTextAppearance(this, TextAppearanceResources
                 .getTexAppearanceResource(mFontSizeId));
         if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
@@ -328,94 +305,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
          * is not ready
          */
         showAlertHeader();
-    }
-
-    private void initRoomNoteScreen() {
-        mNoteEditor.setTextAppearance(this, TextAppearanceResources
-                .getTexAppearanceResource(mFontSizeId));
-
-        if (mRoomNote.isChecklist) {
-            switchToListMode(mRoomNote.content);
-        } else {
-            mNoteEditor.setText(getHighlightQueryResult(mRoomNote.content, mUserQuery));
-            if (mRoomNote.content != null) {
-                mNoteEditor.setSelection(mRoomNote.content.length());
-            }
-        }
-
-        for (Integer id : sBgSelectorSelectionMap.keySet()) {
-            findViewById(sBgSelectorSelectionMap.get(id)).setVisibility(View.GONE);
-        }
-
-        int bgId = mRoomNote.bgColorId;
-        if (bgId < 0 || bgId > ResourceParser.RED) {
-            bgId = ResourceParser.YELLOW;
-        }
-        mHeadViewPanel.setBackgroundResource(ResourceParser.NoteBgResources.getNoteTitleBgResource(bgId));
-        mNoteEditorPanel.setBackgroundResource(ResourceParser.NoteBgResources.getNoteBgResource(bgId));
-
-        mNoteHeaderHolder.tvModified.setText(DateUtils.formatDateTime(this,
-                mRoomNote.modifiedDate, DateUtils.FORMAT_SHOW_DATE
-                        | DateUtils.FORMAT_NUMERIC_DATE | DateUtils.FORMAT_SHOW_TIME
-                        | DateUtils.FORMAT_SHOW_YEAR));
-
-        mNoteHeaderHolder.tvAlertDate.setVisibility(View.GONE);
-        mNoteHeaderHolder.ivAlertIcon.setVisibility(View.GONE);
-    }
-
-    private void saveRoomNote() {
-        if (mRoomNote == null) return;
-        String content;
-        if (mRoomNote.isChecklist) {
-            content = getRoomCheckListText();
-        } else {
-            content = mNoteEditor.getText().toString();
-        }
-        if (TextUtils.isEmpty(content)) {
-            if (TextUtils.isEmpty(mRoomNote.title)) {
-                return; // 空便签不保存
-            }
-        }
-        mRoomNote.title = DataUtils.getFormattedSnippet(content);
-        mRoomNote.content = content;
-        mRoomNote.modifiedDate = System.currentTimeMillis();
-        new Thread(() -> mNoteDao.update(mRoomNote)).start();
-        setResult(RESULT_OK);
-    }
-
-    private String getRoomCheckListText() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < mEditTextList.getChildCount(); i++) {
-            View view = mEditTextList.getChildAt(i);
-            NoteEditText edit = view.findViewById(R.id.et_edit_text);
-            if (!TextUtils.isEmpty(edit.getText())) {
-                CheckBox cb = view.findViewById(R.id.cb_edit_item);
-                if (cb.isChecked()) {
-                    sb.append(TAG_CHECKED).append(" ").append(edit.getText()).append("\n");
-                } else {
-                    sb.append(TAG_UNCHECKED).append(" ").append(edit.getText()).append("\n");
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    private void toggleRoomCheckListMode() {
-        if (mRoomNote == null) return;
-        if (mRoomNote.isChecklist) {
-            // 切换到文本模式
-            mRoomNote.content = getRoomCheckListText()
-                    .replace(TAG_CHECKED + " ", "").replace(TAG_UNCHECKED + " ", "");
-            mRoomNote.isChecklist = false;
-            mEditTextList.setVisibility(View.GONE);
-            mNoteEditor.setVisibility(View.VISIBLE);
-            mNoteEditor.setText(mRoomNote.content);
-        } else {
-            // 切换到清单模式
-            mRoomNote.content = mNoteEditor.getText().toString();
-            mRoomNote.isChecklist = true;
-            switchToListMode(mRoomNote.content);
-        }
     }
 
     private void showAlertHeader() {
@@ -444,12 +333,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        if (mRoomMode && mRoomNote != null) {
-            saveRoomNote();
-            outState.putLong(Intent.EXTRA_UID, mRoomNote.id);
-            outState.putBoolean(Notes.INTENT_EXTRA_ROOM_NOTE_ID, true);
-            return;
-        }
         /**
          * For new note without note id, we should firstly save it to
          * generate a id. If the editing note is not worth saving, there
@@ -534,12 +417,8 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     @Override
     protected void onPause() {
         super.onPause();
-        if (mRoomMode) {
-            saveRoomNote();
-        } else {
-            if(saveNote()) {
-                Log.d(TAG, "Note data was saved with length:" + mWorkingNote.getContent().length());
-            }
+        if(saveNote()) {
+            Log.d(TAG, "Note data was saved with length:" + mWorkingNote.getContent().length());
         }
         clearSettingState();
     }
@@ -568,24 +447,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         if (id == R.id.btn_set_bg_color) {
             mNoteBgColorSelector.setVisibility(View.VISIBLE);
             findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
-                    -                    View.VISIBLE);
+                    View.VISIBLE);
         } else if (sBgSelectorBtnsMap.containsKey(id)) {
-            if (mRoomMode && mRoomNote != null) {
-                int oldBgId = mRoomNote.bgColorId;
-                int newBgId = sBgSelectorBtnsMap.get(id);
-                if (sBgSelectorSelectionMap.containsKey(oldBgId)) {
-                    findViewById(sBgSelectorSelectionMap.get(oldBgId)).setVisibility(View.GONE);
-                }
-                mRoomNote.bgColorId = newBgId;
-                mHeadViewPanel.setBackgroundResource(ResourceParser.NoteBgResources.getNoteTitleBgResource(newBgId));
-                mNoteEditorPanel.setBackgroundResource(ResourceParser.NoteBgResources.getNoteBgResource(newBgId));
-                mRoomNote.modifiedDate = System.currentTimeMillis();
-                new Thread(() -> mNoteDao.update(mRoomNote)).start();
-            } else {
-                findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
-                        View.GONE);
-                mWorkingNote.setBgColorId(sBgSelectorBtnsMap.get(id));
-            }
+            findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
+                    View.GONE);
+            mWorkingNote.setBgColorId(sBgSelectorBtnsMap.get(id));
             mNoteBgColorSelector.setVisibility(View.GONE);
         } else if (sFontSizeBtnsMap.containsKey(id)) {
             findViewById(sFontSelectorSelectionMap.get(mFontSizeId)).setVisibility(View.GONE);
@@ -609,11 +475,7 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             return;
         }
 
-        if (mRoomMode) {
-            saveRoomNote();
-        } else {
-            saveNote();
-        }
+        saveNote();
         super.onBackPressed();
     }
 
@@ -642,29 +504,20 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         }
         clearSettingState();
         menu.clear();
-        if (mRoomMode) {
-            getMenuInflater().inflate(R.menu.note_edit, menu);
-            if (mRoomNote != null && mRoomNote.isChecklist) {
-                menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_normal_mode);
-            }
-            menu.findItem(R.id.menu_alert).setVisible(false);
-            menu.findItem(R.id.menu_delete_remind).setVisible(false);
+        if (mWorkingNote.getFolderId() == Notes.ID_CALL_RECORD_FOLDER) {
+            getMenuInflater().inflate(R.menu.call_note_edit, menu);
         } else {
-            if (mWorkingNote.getFolderId() == Notes.ID_CALL_RECORD_FOLDER) {
-                getMenuInflater().inflate(R.menu.call_note_edit, menu);
-            } else {
-                getMenuInflater().inflate(R.menu.note_edit, menu);
-            }
-            if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
-                menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_normal_mode);
-            } else {
-                menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_list_mode);
-            }
-            if (mWorkingNote.hasClockAlert()) {
-                menu.findItem(R.id.menu_alert).setVisible(false);
-            } else {
-                menu.findItem(R.id.menu_delete_remind).setVisible(false);
-            }
+            getMenuInflater().inflate(R.menu.note_edit, menu);
+        }
+        if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
+            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_normal_mode);
+        } else {
+            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_list_mode);
+        }
+        if (mWorkingNote.hasClockAlert()) {
+            menu.findItem(R.id.menu_alert).setVisible(false);
+        } else {
+            menu.findItem(R.id.menu_delete_remind).setVisible(false);
         }
         return true;
     }
@@ -695,12 +548,8 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             mFontSizeSelector.setVisibility(View.VISIBLE);
             findViewById(sFontSelectorSelectionMap.get(mFontSizeId)).setVisibility(View.VISIBLE);
         } else if (itemId == R.id.menu_list_mode) {
-            if (mRoomMode && mRoomNote != null) {
-                toggleRoomCheckListMode();
-            } else {
-                mWorkingNote.setCheckListMode(mWorkingNote.getCheckListMode() == 0 ?
-                        TextNote.MODE_CHECK_LIST : 0);
-            }
+            mWorkingNote.setCheckListMode(mWorkingNote.getCheckListMode() == 0 ?
+                    TextNote.MODE_CHECK_LIST : 0);
         } else if (itemId == R.id.menu_share) {
             sendTo(this, getCurrentNoteContent());
         } else if (itemId == R.id.menu_send_to_desktop) {
@@ -729,12 +578,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
      * and {@text/plain} type
      */
     private String getCurrentNoteContent() {
-        if (mRoomMode && mRoomNote != null) {
-            if (mRoomNote.isChecklist) {
-                return getRoomCheckListText();
-            }
-            return mRoomNote.content != null ? mRoomNote.content : "";
-        }
         getWorkingText();
         return mWorkingNote.getContent();
     }
@@ -759,16 +602,6 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     }
 
     private void deleteCurrentNote() {
-        if (mRoomMode && mRoomNote != null) {
-            if (!isSyncMode()) {
-                mRoomNote.isDeleted = true;
-            } else {
-                mRoomNote.parentId = Notes.ID_TRASH_FOLER;
-                mRoomNote.modifiedDate = System.currentTimeMillis();
-            }
-            new Thread(() -> mNoteDao.update(mRoomNote)).start();
-            return;
-        }
         if (mWorkingNote.existInDatabase()) {
             HashSet<Long> ids = new HashSet<Long>();
             long id = mWorkingNote.getNoteId();
@@ -1023,26 +856,17 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         long noteId;
         String content;
 
-        if (mRoomMode && mRoomNote != null) {
-            saveRoomNote();
-            noteId = mRoomNote.id;
-            content = mRoomNote.content != null ? mRoomNote.content : "";
-        } else {
-            if (!mWorkingNote.existInDatabase()) {
-                saveNote();
-            }
-            noteId = mWorkingNote.getNoteId();
-            content = mWorkingNote.getContent();
+        if (!mWorkingNote.existInDatabase()) {
+            saveNote();
         }
+        noteId = mWorkingNote.getNoteId();
+        content = mWorkingNote.getContent();
 
         if (noteId > 0) {
             Intent sender = new Intent();
             Intent shortcutIntent = new Intent(this, NoteEditActivity.class);
             shortcutIntent.setAction(Intent.ACTION_VIEW);
             shortcutIntent.putExtra(Intent.EXTRA_UID, noteId);
-            if (mRoomMode) {
-                shortcutIntent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, true);
-            }
             sender.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
             sender.putExtra(Intent.EXTRA_SHORTCUT_NAME, makeShortcutIconTitle(content));
             sender.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
