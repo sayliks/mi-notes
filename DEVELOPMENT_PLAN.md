@@ -69,27 +69,27 @@ WebDAV 当前仍基于 provider 导入 / 导出快照。Room 迁移前不要把�
 - 覆盖远端或导入远端前会创建单一、可预测的备份快照。
 - 已添加 WebDAV URL、备份、安全上传和损坏快照解析测试。
 
-## 当前风险
+## 当前风险与缓解状态
 
 **Provider 与 Room 双写/双读边界不清晰**
 
-影响：列表、编辑和同步可能看到不同数据。处理方向：明确迁移阶段的数据权威来源，并补齐桥接逻辑。
+状态：已通过 `NotesRepository` 收口。迁移阶段以 `NotesProvider` / `note.db` 为权威数据源，Room 只作为列表读模型。处理方向：后续继续把剩余 provider 入口收敛到 repository。
 
 **`allowMainThreadQueries()` 仍存在**
 
-影响：数据库访问可能阻塞主线程。处理方向：完成异步 DAO 调用后移除。
+状态：已移除。Room 读模型刷新和 provider 写入改为后台执行。处理方向：继续清理旧 UI 中直接调用 provider 的小范围同步查询。
 
 **Room 数据库与 legacy 数据库迁移未闭环**
 
-影响：升级路径可能丢数据或产生重复数据。处理方向：设计一次性迁移和回滚策略。
+状态：已增加 provider -> Room read model 重建、Room-only 记录回填 provider、迁移完成标记和计数校验。处理方向：补充 instrumentation tests 覆盖真实数据库升级样本。
 
 **小组件、闹钟、搜索仍依赖旧模型**
 
-影响：Room-only 改动可能造成回归。处理方向：迁移前建立功能清单和验收用例。
+状态：迁移阶段继续读取 `NotesProvider`，避免 Room-only 改动造成回归。处理方向：按 `MIGRATION_VERIFICATION.md` 验证，再逐步建立兼容测试。
 
 **非 WebDAV 流程测试不足**
 
-影响：回归仍然依赖手动验证。处理方向：按风险补单元测试和少量 instrumentation 测试。
+状态：已补充迁移校验单元测试和手动验收清单。处理方向：继续补 provider contract、widget、alarm、search 的 instrumentation tests。
 
 ## 后续路线图
 

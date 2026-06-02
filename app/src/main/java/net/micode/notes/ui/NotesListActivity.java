@@ -375,7 +375,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
     private void batchDelete() {
         HashSet<Long> ids = mAdapter.getSelectedIds();
-        mViewModel.batchDelete(ids);
+        mViewModel.batchDelete(ids, isSyncMode());
         if (mActionMode != null) mActionMode.finish();
     }
 
@@ -401,7 +401,6 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         Intent intent = new Intent(this, NoteEditActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
         intent.putExtra(Intent.EXTRA_UID, note.id);
-        intent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, note.id);
         this.startActivityForResult(intent, REQUEST_CODE_OPEN_NODE);
     }
 
@@ -430,22 +429,21 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         View sheet = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_new_note, null);
         sheet.findViewById(R.id.btn_text_note).setOnClickListener(v -> {
             dialog.dismiss();
-            openNewRoomNote(false);
+            openNewLegacyNote(false);
         });
         sheet.findViewById(R.id.btn_checklist).setOnClickListener(v -> {
             dialog.dismiss();
-            openNewRoomNote(true);
+            openNewLegacyNote(true);
         });
         dialog.setContentView(sheet);
         dialog.show();
     }
 
-    private void openNewRoomNote(boolean isChecklist) {
-        long noteId = mViewModel.createNote(NoteEntity.CONTENT_TYPE_TEXT, isChecklist);
+    private void openNewLegacyNote(boolean isChecklist) {
         Intent intent = new Intent(this, NoteEditActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.putExtra(Intent.EXTRA_UID, noteId);
-        intent.putExtra(Notes.INTENT_EXTRA_ROOM_NOTE_ID, noteId);
+        intent.setAction(Intent.ACTION_INSERT_OR_EDIT);
+        intent.putExtra(Notes.INTENT_EXTRA_FOLDER_ID, mViewModel.getCurrentFolderId());
+        intent.putExtra(Notes.INTENT_EXTRA_CHECKLIST_MODE, isChecklist);
         startActivityForResult(intent, REQUEST_CODE_NEW_NODE);
     }
 
