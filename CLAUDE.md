@@ -73,7 +73,7 @@ Room entities and DAO live under:
 - `NotesListActivity` shows the RecyclerView list and delegates list data/mutations through `NotesViewModel` -> `NotesRepository`.
 - `NoteEditActivity` uses legacy `WorkingNote` / `Note` so edits continue through `NotesProvider`.
 - `NotesPreferenceActivity` owns sync settings and WebDAV configuration.
-- `AlarmAlertActivity` and `AlarmInitReceiver` continue to read notes through provider-backed utilities.
+- `AlarmReceiver`, `AlarmAlertActivity`, and `AlarmInitReceiver` continue to use provider note ids and provider-backed utilities.
 - `NoteWidgetProvider*` reads notes by widget id through provider queries.
 
 ## Sync
@@ -93,3 +93,4 @@ Legacy Google Tasks code remains under `gtask/` and should be treated as histori
 Current local unit tests cover WebDAV URL/snapshot safety and migration validation. Add focused tests for any change that affects deletion, import/export, migration, conflict handling, or backup behavior.
 
 Manual migration acceptance cases live in [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md).
+Alarm/widget code boundaries and debug trigger commands live in [ALARM_WIDGET_VERIFICATION.md](ALARM_WIDGET_VERIFICATION.md).

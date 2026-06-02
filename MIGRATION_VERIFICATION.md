@@ -78,6 +78,8 @@ Room 目前是列表 UI 的兼容读模型，不是写入权威来源。这个�
 2. 重启设备或触发 `AlarmInitReceiver`。
 3. 确认提醒响起后打开的是正确便签内容。
 
+详细的闹钟 / 小组件代码入口、debug-only 手动触发命令和回归检查见 [ALARM_WIDGET_VERIFICATION.md](ALARM_WIDGET_VERIFICATION.md)。
+
 ## 后续自动化建议
 
 - 为 provider contract 增加 instrumentation tests：insert、update、delete、move、search。

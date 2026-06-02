@@ -44,6 +44,7 @@
 
 - [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)：现代化路线图和迁移原则。
 - [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md)：Room / Provider / WebDAV 迁移验证清单。
+- [ALARM_WIDGET_VERIFICATION.md](ALARM_WIDGET_VERIFICATION.md)：闹钟提醒和桌面小组件的代码边界与安全测试步骤。
 - [AGENTS.md](AGENTS.md)：面向代码代理的项目约束。
 
 ## 开源协议
