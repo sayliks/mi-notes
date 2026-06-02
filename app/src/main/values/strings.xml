@@ -134,7 +134,7 @@
     <string name="preferences_webdav_last_result_success">Success</string>
     <string name="preferences_webdav_last_result_failed">Failed</string>
     <string name="preferences_webdav_last_result_format">%3$s\n%1$s\n%2$s</string>
-    <string name="preferences_webdav_help">Use a WebDAV folder URL to store mi-notes-sync.json, or enter a direct .json file URL, including Chinese filenames such as 小米便签同步.json. Conflict rule: if the remote snapshot is newer and this device has no local changes, it downloads; otherwise this device uploads local notes. A timestamped backup is written before local import or remote overwrite.</string>
+    <string name="preferences_webdav_help">Use a WebDAV folder URL to store mi-notes-sync.json, or enter a direct .json file URL, including Chinese filenames such as 小米便签同步.json. Conflict rule: if the remote snapshot is newer and this device has no local changes, it downloads; otherwise this device uploads local notes. A predictable .backup.json file is written before local import or remote overwrite.</string>
     <string name="preferences_last_sync_time">Last sync time %1$s</string>
     <string name="preferences_last_sync_time_never">Last sync time: never synced</string>
     <string name="preferences_last_sync_time_format">yyyy-MM-dd hh:mm:ss</string>
