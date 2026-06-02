@@ -21,6 +21,14 @@ WebDAV 同步
 
 Room 目前是列表 UI 的兼容读模型，不是写入权威来源。这个约束可以避免列表、编辑、搜索、小组件、闹钟和 WebDAV 同步看到不同的数据。
 
+## 代码边界
+
+- `NotesRepository`：provider 到 Room read model 的唯一桥接层。
+- `NoteEditActivity`：继续使用 `WorkingNote` / `Note` 写入 provider。
+- `NotesListActivity`：通过 `NotesViewModel` 使用 Room read model 展示列表，但新建、打开和批量操作仍落到 provider 语义。
+- `WebDavSyncManager`：继续通过 provider 导入 / 导出快照。
+- `NoteWidgetProvider*`、`AlarmInitReceiver`、`AlarmAlertActivity`、搜索入口：继续使用 provider-backed 查询。
+
 ## 迁移安全
 
 - Room read model 从 provider 后台重建。

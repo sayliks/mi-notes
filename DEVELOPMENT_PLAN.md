@@ -17,11 +17,11 @@
 | 平台 | `minSdk 21`，`targetSdk 36` | 已完成基础兼容性升级。 |
 | 语言 | Java 为主，已启用 Kotlin 插件 | 允许 Java / Kotlin 混编，但当前核心代码仍是 Java。 |
 | 依赖 | AndroidX、Room、Lifecycle、RecyclerView、Markwon 已接入 | 依赖已具备，迁移工作不再受基础设施阻塞。 |
-| 数据存储 | Legacy SQLite + `NotesProvider` 与 Room 并存 | Provider 仍服务旧编辑、同步、提醒和小组件路径；Room 已用于新列表 / 部分编辑路径。 |
+| 数据存储 | Legacy SQLite + `NotesProvider` 与 Room 并存 | Provider 是迁移阶段权威数据源；Room 是列表 UI 的兼容读模型。 |
 | 列表 UI | `RecyclerView` + `ListAdapter` 已接入 | `NotesListActivity` 仍承载较多业务逻辑，需要继续拆分。 |
-| 编辑 UI | `NoteEditActivity` 处于混合模式 | 同时支持 legacy `WorkingNote` 和 Room note。 |
+| 编辑 UI | `NoteEditActivity` 使用 legacy `WorkingNote` | 编辑继续经由 provider，避免 Room-only 编辑造成同步、搜索、小组件不一致。 |
 | 同步 | WebDAV 为当前推荐同步路径 | Google Tasks 旧认证路径不再作为主线；Google REST Tasks API 本身仍可用，但不是当前优先方案。 |
-| 测试 | WebDAV 单元测试已建立 | 其他数据迁移和 UI 流程仍缺少自动化覆盖。 |
+| 测试 | WebDAV 与迁移校验单元测试已建立 | provider contract、UI、搜索、小组件和闹钟仍缺少 instrumentation 覆盖。 |
 
 ## 必须保护的系统边界
 
@@ -113,20 +113,20 @@ WebDAV 当前仍基于 provider 导入 / 导出快照。Room 迁移前不要把�
 
 ### Phase 2：Provider / Room 数据边界
 
-目标：结束模糊的混合存储状态，为 Room 迁移建立可验证的边界。
+目标：在已建立的 provider-authoritative 边界上继续收敛剩余直接 provider 入口，为最终 Room-authoritative 阶段做准备。
 
 交付项：
 
-- 列出所有 provider 读写入口：编辑、列表、同步、小组件、提醒、搜索、批量删除、移动文件夹。
-- 定义迁移期间的权威数据源：按功能分阶段切换，而不是同时维护两个互不一致的数据源。
-- 设计 legacy `note` / `data` 表到 Room entity 的迁移流程。
-- 明确系统文件夹 ID、回收站语义、文件夹计数、snippet、`LOCAL_MODIFIED` 和 `VERSION` 的等价实现。
-- 移除或隔离 `allowMainThreadQueries()`。
+- 将剩余 provider 读写入口逐步移动到 `NotesRepository`，包括搜索、小组件、提醒和导出。
+- 为 legacy `note` / `data` 到 Room read model 增加真实数据库样本测试。
+- 补齐系统文件夹 ID、回收站语义、文件夹计数、snippet、`LOCAL_MODIFIED` 和 `VERSION` 的 contract tests。
+- 清理旧 UI 中仍可能阻塞主线程的 provider 查询。
+- 设计最终 Room-authoritative 阶段的兼容 URI/provider 策略。
 
 验收标准：
 
 - 升级旧数据库后便签、文件夹、清单、提醒和通话记录仍可打开。
-- Room 数据与 provider 导出的快照一致。
+- Room read model 数据与 provider 导出的快照一致。
 - 回收站、批量删除、移动文件夹不会破坏计数或同步状态。
 
 ### Phase 3：列表与编辑迁移
@@ -137,7 +137,7 @@ WebDAV 当前仍基于 provider 导入 / 导出快照。Room 迁移前不要把�
 
 - 继续收敛 `NotesListActivity`，把查询和批量操作下沉到 ViewModel / repository。
 - 保留现有文件夹、通话记录文件夹、批量选择、移动和删除行为。
-- 梳理 `NoteEditActivity` 的 legacy / Room 双路径，减少重复保存逻辑。
+- 保持 `NoteEditActivity` provider-backed，直到同步、搜索、小组件和提醒有完整兼容测试。
 - 为新建、编辑、删除、恢复、移动添加 focused tests。
 
 验收标准：

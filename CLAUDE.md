@@ -1,109 +1,95 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for Claude Code when working in this repository.
 
 ## Build Commands
 
-```bash
-# Assemble debug APK
-./gradlew assembleDebug
+Use the Gradle wrapper from the repository root:
 
-# Assemble release APK (ProGuard enabled but minifyEnabled=false)
-./gradlew assembleRelease
-
-# Clean build outputs
-./gradlew clean
-
-# Check dependencies (no lint/tests configured)
-./gradlew app:dependencies
+```powershell
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:testDebugUnitTest --tests net.micode.notes.sync.webdav.*
+.\gradlew.bat :app:testDebugUnitTest --tests net.micode.notes.data.repository.*
+.\gradlew.bat clean
 ```
 
-Gradle 9.5.1, AGP 9.0.0, Java 8, Groovy DSL. Single module `:app`. Aliyun mirrors in settings.gradle for China-based development.
-
-No test infrastructure exists — no `src/test/`, no test dependencies. No CI/CD config.
+The active module is `:app`. Gradle uses Android Gradle Plugin 9.x, Java 8 bytecode, Kotlin plugin/kapt, and a Groovy DSL.
 
 ## Project Identity
 
-MiCode Notes — open-source Android note-taking app (Apache 2.0). Package: `net.micode.notes`. Legacy pre-Jetpack architecture. App name: "Notes" (appears as 小米便签 in Chinese localization).
+MiCode Notes is an Apache 2.0 Android note-taking app. Package: `net.micode.notes`. App name appears as "Notes" in English and 小米便签 in Chinese localization.
 
-## Resource Layout (Non-Standard)
+## Resource Layout
 
-Resources live at **repo root `res/`**, not under `app/src/main/res/`. Configured via `sourceSets { main { res.srcDirs = ['../res'] } }` in `app/build.gradle:14`. All drawables are in `drawable-hdpi` only — no other density buckets. Locales: English (default), zh-rCN, zh-rTW.
+The active Android resources are rooted at repository-level `res/`, configured by `app/build.gradle`:
 
-## Architecture: ContentProvider + SQLite (No ViewModel)
+```groovy
+sourceSets {
+    main {
+        res.srcDirs = ['../res']
+    }
+}
+```
 
-All data access goes through `NotesProvider` (authority: `micode_notes`), a `ContentProvider` with `multiprocess=true`. No Room, no Repository pattern.
+Some mirrored resources may exist under `app/src/main/values*`; keep mirrors in sync only when the surrounding patch already touches them. The canonical runtime resource tree is `res/`.
 
-### Two-Table Database (`note.db`, version 4)
+## Architecture
 
-Defined in `app/src/main/java/net/micode/notes/data/NotesDatabaseHelper.java`.
+### Migration Boundary
+
+The current migration stage is provider-authoritative:
+
+- `NotesProvider` and legacy `note.db` remain the source of truth.
+- `NotesRepository` is the compatibility layer between provider and Room.
+- Room is a background-refreshed read model for the RecyclerView list.
+- Editing, WebDAV sync, widgets, alarms, and search still depend on provider semantics.
+
+Do not write directly to Room for user data unless the change explicitly updates the repository contract and preserves provider compatibility.
+
+### Legacy Database
+
+`NotesDatabaseHelper` owns `note.db`, version 4. The schema has two main tables:
 
 | Table | Purpose |
-|-------|---------|
-| `note` | Note/folder metadata (parent_id, type, snippet, bg_color_id, sync fields) |
-| `data` | Actual content rows with MIME type discrimination (`text_note`, `call_note`) |
+|---|---|
+| `note` | Note/folder metadata: parent, type, snippet, color, sync fields, versions. |
+| `data` | Content rows keyed by MIME type, including text notes and call notes. |
 
-Modeled after Android ContactsContract: each note is a `note` row with child `data` rows. Content types live in `Notes.java` as constants.
+SQLite triggers maintain folder counts, snippets, cascade deletes, trash moves, and content synchronization. Provider updates also maintain `VERSION` and `LOCAL_MODIFIED` behavior. Avoid bypassing these invariants.
 
-**12 SQLite triggers** maintain integrity: auto-updating folder note counts, note snippets from data changes, cascade deletes, trash moves, sync version bumps.
+### Room Read Model
 
-### System Folders (Negative IDs)
+Room entities and DAO live under:
 
-Four special folders identified by negative IDs in `Notes.java:33-36`:
-- `0` = Root folder (default)
-- `-1` = Temporary folder (notes with no folder assignment)
-- `-2` = Call Record folder
-- `-3` = Trash folder
+- `app/src/main/java/net/micode/notes/data/entity/`
+- `app/src/main/java/net/micode/notes/data/dao/`
+- `app/src/main/java/net/micode/notes/data/database/`
 
-### Content URIs
-
-```
-content://micode_notes/note        — all notes/folders
-content://micode_notes/data        — all data rows
-content://micode_notes/text_note   — text note data
-content://micode_notes/call_note   — call note data
-```
-
-## Package Layout
-
-```
-net.micode.notes/
-  data/       — Notes.java (constants/URIs), NotesProvider, NotesDatabaseHelper, Contact
-  model/      — Note (CRUD via ContentValues), WorkingNote (editing session)
-  ui/         — Activities, adapters, custom views, alarm receivers
-  widget/     — 2x2 and 4x4 AppWidgetProviders
-  tool/       — BackupUtils, DataUtils, GTaskStringUtils, ResourceParser
-  gtask/
-    data/     — Node/Task/TaskList/MetaData/SqlNote/SqlData (sync model)
-    exception/— ActionFailureException, NetworkFailureException
-    remote/   — GTaskClient (Apache HttpClient), GTaskManager, GTaskSyncService, GTaskASyncTask
-```
+`NotesRepository` rebuilds the Room read model from `NotesProvider` in the background and records migration validation metadata only after successful validation. The legacy database is not deleted, renamed, or overwritten during this stage.
 
 ## UI Flow
 
-- `NotesListActivity` — launcher activity, shows note list via `ListView` + `CursorAdapter`. FAB creates new note.
-- `NoteEditActivity` — note editor with custom `NoteEditText`. Handles checklists, color themes, alarms. Registered for VIEW/INSERT_OR_EDIT/SEARCH intents.
-- `AlarmAlertActivity` — singleInstance popup for note alarms, runs in `:remote` process.
-- `NotesPreferenceActivity` — settings (sync account picker, random background toggle).
+- `NotesListActivity` shows the RecyclerView list and delegates list data/mutations through `NotesViewModel` -> `NotesRepository`.
+- `NoteEditActivity` uses legacy `WorkingNote` / `Note` so edits continue through `NotesProvider`.
+- `NotesPreferenceActivity` owns sync settings and WebDAV configuration.
+- `AlarmAlertActivity` and `AlarmInitReceiver` continue to read notes through provider-backed utilities.
+- `NoteWidgetProvider*` reads notes by widget id through provider queries.
 
-## Google Tasks Sync
+## Sync
 
-Legacy sync implementation using Apache HttpClient (`org.apache.http.legacy`). Auth via Android `AccountManager`. Sync is bidirectional with version columns for conflict detection.
+WebDAV is the current supported sync direction:
 
-Key classes:
-- `GTaskClient` — HTTP client for Google Tasks REST API JSON
-- `GTaskManager` — sync logic orchestrator
-- `GTaskSyncService` — background `Service` for sync
-- `GTaskASyncTask` — `AsyncTask` with notification progress
+- folder URLs and direct JSON snapshot URLs are supported
+- Chinese paths and snapshot filenames are supported
+- already encoded paths must not be double-encoded
+- `.backup.json` snapshots are written before local import or remote overwrite
+- provider import/export remains the WebDAV storage boundary
 
-## Permissions
+Legacy Google Tasks code remains under `gtask/` and should be treated as historical compatibility code unless a task explicitly modernizes it with current OAuth/REST behavior.
 
-`INTERNET`, `WRITE_EXTERNAL_STORAGE`, `READ_CONTACTS`, `RECEIVE_BOOT_COMPLETED`, `INSTALL_SHORTCUT`, and 4 Google account permissions (`MANAGE_ACCOUNTS`, `AUTHENTICATE_ACCOUNTS`, `GET_ACCOUNTS`, `USE_CREDENTIALS`).
+## Testing
 
-## Five Color Themes
+Current local unit tests cover WebDAV URL/snapshot safety and migration validation. Add focused tests for any change that affects deletion, import/export, migration, conflict handling, or backup behavior.
 
-YELLOW (default), BLUE, WHITE, GREEN, RED. Separate drawable resources for list items (up/middle/down/single segments), widgets (2x/4x), and editor. `ResourceParser.java` maps background IDs to resources.
-
-## Checklist Mode
-
-Text notes support checklist mode. Content split by `\n` into items, prefixed with `\u221A` (✓) or `\u25A1` (□). Controlled by `TextNote.MODE = DATA1`, value 1 = checklist mode.
+Manual migration acceptance cases live in [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md).
