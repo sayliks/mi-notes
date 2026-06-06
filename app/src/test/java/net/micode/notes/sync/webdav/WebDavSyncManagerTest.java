@@ -21,6 +21,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import net.micode.notes.R;
+
 import org.json.JSONException;
 import org.junit.Test;
 
@@ -108,6 +110,20 @@ public class WebDavSyncManagerTest {
         } catch (JSONException expected) {
             assertTrue(expected.getMessage().length() > 0);
         }
+    }
+
+    @Test
+    public void testConnectionValidation_emptyUrlReturnsDedicatedResult() {
+        assertEquals(WebDavSyncManager.STATE_EMPTY_URL,
+                WebDavSyncManager.getTestConnectionValidationState(null));
+        assertEquals(WebDavSyncManager.STATE_EMPTY_URL,
+                WebDavSyncManager.getTestConnectionValidationState(""));
+        assertEquals(WebDavSyncManager.STATE_EMPTY_URL,
+                WebDavSyncManager.getTestConnectionValidationState("   "));
+        assertEquals(WebDavSyncManager.STATE_SUCCESS,
+                WebDavSyncManager.getTestConnectionValidationState("https://example.com/dav"));
+        assertEquals(R.string.sync_result_empty_url,
+                WebDavSyncManager.getResultMessageResId(WebDavSyncManager.STATE_EMPTY_URL));
     }
 
     private static class FakeTransport implements WebDavSyncManager.SnapshotTransport {

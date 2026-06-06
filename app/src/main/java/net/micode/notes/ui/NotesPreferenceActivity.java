@@ -285,7 +285,7 @@ public class NotesPreferenceActivity extends AppCompatActivity {
 
     private void testWebDavConnection() {
         if (!isSyncConfigured(this)) {
-            Toast.makeText(this, R.string.sync_result_not_configured, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.sync_result_empty_url, Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -469,16 +469,60 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     }
 
     public static boolean isSyncConfigured(Context context) {
-        return !TextUtils.isEmpty(getWebDavUrl(context).trim());
+        return !TextUtils.isEmpty(normalizeWebDavUrl(getWebDavUrl(context)));
     }
 
     private void setWebDavConfig(String url, String userName, String password) {
         SharedPreferences settings = getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
+        saveWebDavConfig(settings, url, userName, password);
+    }
+
+    static void saveWebDavConfig(SharedPreferences settings, String url, String userName,
+            String password) {
+        String normalizedUrl = normalizeWebDavUrl(url);
+        String normalizedUserName = normalizeWebDavUserName(userName);
+        String normalizedPassword = normalizeWebDavPassword(password);
+        boolean changed = isWebDavConfigChanged(
+                settings.getString(PREFERENCE_WEBDAV_URL, ""),
+                settings.getString(PREFERENCE_WEBDAV_USERNAME, ""),
+                settings.getString(PREFERENCE_WEBDAV_PASSWORD, ""),
+                normalizedUrl, normalizedUserName, normalizedPassword);
         SharedPreferences.Editor editor = settings.edit();
-        editor.putString(PREFERENCE_WEBDAV_URL, url == null ? "" : url.trim());
-        editor.putString(PREFERENCE_WEBDAV_USERNAME, userName == null ? "" : userName.trim());
-        editor.putString(PREFERENCE_WEBDAV_PASSWORD, password == null ? "" : password);
+        editor.putString(PREFERENCE_WEBDAV_URL, normalizedUrl);
+        editor.putString(PREFERENCE_WEBDAV_USERNAME, normalizedUserName);
+        editor.putString(PREFERENCE_WEBDAV_PASSWORD, normalizedPassword);
+        if (changed) {
+            clearWebDavServerSyncState(editor);
+        }
         editor.commit();
+    }
+
+    static boolean isWebDavConfigChanged(String oldUrl, String oldUserName, String oldPassword,
+            String newUrl, String newUserName, String newPassword) {
+        return !normalizeWebDavUrl(oldUrl).equals(normalizeWebDavUrl(newUrl))
+                || !normalizeWebDavUserName(oldUserName).equals(
+                        normalizeWebDavUserName(newUserName))
+                || !normalizeWebDavPassword(oldPassword).equals(
+                        normalizeWebDavPassword(newPassword));
+    }
+
+    static void clearWebDavServerSyncState(SharedPreferences.Editor editor) {
+        editor.remove(PREFERENCE_LAST_SYNC_TIME);
+        editor.remove(PREFERENCE_LAST_SYNC_RESULT_MESSAGE);
+        editor.remove(PREFERENCE_LAST_SYNC_RESULT_TIME);
+        editor.remove(PREFERENCE_LAST_SYNC_RESULT_STATE);
+    }
+
+    static String normalizeWebDavUrl(String url) {
+        return url == null ? "" : url.trim();
+    }
+
+    static String normalizeWebDavUserName(String userName) {
+        return userName == null ? "" : userName.trim();
+    }
+
+    static String normalizeWebDavPassword(String password) {
+        return password == null ? "" : password;
     }
 
     public static void setLastSyncResult(Context context, int result, String message) {

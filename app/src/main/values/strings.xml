@@ -101,6 +101,7 @@
     <string name="sync_progress_webdav_uploading">Uploading notes to WebDAV...</string>
     <string name="sync_progress_webdav_testing">Testing WebDAV connection...</string>
     <string name="sync_result_success">Sync completed</string>
+    <string name="sync_result_empty_url">Enter a WebDAV URL before testing the connection</string>
     <string name="sync_result_invalid_url">WebDAV sync failed: enter an http or https URL</string>
     <string name="sync_result_uploaded_local">Uploaded local notes to WebDAV</string>
     <string name="sync_result_uploaded_local_conflict">Uploaded local notes because this device has local changes</string>
@@ -137,7 +138,7 @@
     <string name="preferences_webdav_help">Use a WebDAV folder URL to store mi-notes-sync.json, or enter a direct .json file URL, including Chinese filenames such as 小米便签同步.json. Conflict rule: if the remote snapshot is newer and this device has no local changes, it downloads; otherwise this device uploads local notes. A predictable .backup.json file is written before local import or remote overwrite.</string>
     <string name="preferences_last_sync_time">Last sync time %1$s</string>
     <string name="preferences_last_sync_time_never">Last sync time: never synced</string>
-    <string name="preferences_last_sync_time_format">yyyy-MM-dd hh:mm:ss</string>
+    <string name="preferences_last_sync_time_format">yyyy-MM-dd HH:mm:ss</string>
     <string name="preferences_add_account">Add account</string>
     <string name="preferences_menu_change_account">Change sync account</string>
     <string name="preferences_menu_remove_account">Remove sync account</string>

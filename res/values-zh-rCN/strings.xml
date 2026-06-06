@@ -97,6 +97,7 @@
     <string name="sync_progress_webdav_uploading">正在上传便签到 WebDAV...</string>
     <string name="sync_progress_webdav_testing">正在测试 WebDAV 连接...</string>
     <string name="sync_result_success">同步完成</string>
+    <string name="sync_result_empty_url">请输入 WebDAV URL 后再测试连接</string>
     <string name="sync_result_invalid_url">WebDAV 同步失败：请输入 http 或 https URL</string>
     <string name="sync_result_uploaded_local">已将本机便签上传到 WebDAV</string>
     <string name="sync_result_uploaded_local_conflict">本机有本地修改，已上传本机便签</string>

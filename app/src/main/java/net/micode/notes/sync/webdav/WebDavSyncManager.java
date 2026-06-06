@@ -63,6 +63,8 @@ public class WebDavSyncManager {
 
     public static final int STATE_BACKUP_ERROR = 11;
 
+    public static final int STATE_EMPTY_URL = 12;
+
     private static final String JSON_VERSION = "version";
 
     private static final String JSON_GENERATED_AT = "generated_at";
@@ -280,8 +282,9 @@ public class WebDavSyncManager {
 
     public int testConnection(Context context) {
         String url = NotesPreferenceActivity.getWebDavUrl(context);
-        if (TextUtils.isEmpty(url == null ? "" : url.trim())) {
-            return STATE_NOT_CONFIGURED;
+        int validationState = getTestConnectionValidationState(url);
+        if (validationState != STATE_SUCCESS) {
+            return validationState;
         }
 
         try {
@@ -334,9 +337,15 @@ public class WebDavSyncManager {
                 return R.string.sync_result_remote_not_found;
             case STATE_BACKUP_ERROR:
                 return R.string.sync_result_backup_error;
+            case STATE_EMPTY_URL:
+                return R.string.sync_result_empty_url;
             default:
                 return R.string.sync_result_internal_error;
         }
+    }
+
+    static int getTestConnectionValidationState(String url) {
+        return isBlank(url) ? STATE_EMPTY_URL : STATE_SUCCESS;
     }
 
     private int mapWebDavError(WebDavClient.WebDavException e) {
@@ -406,6 +415,10 @@ public class WebDavSyncManager {
 
     private static boolean isEmpty(String value) {
         return value == null || value.length() == 0;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().length() == 0;
     }
 
     private boolean hasLocalChanges(Context context) {

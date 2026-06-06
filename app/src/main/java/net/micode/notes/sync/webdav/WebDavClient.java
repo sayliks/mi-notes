@@ -16,7 +16,6 @@
 
 package net.micode.notes.sync.webdav;
 
-import android.text.TextUtils;
 import android.util.Base64;
 
 import java.io.BufferedInputStream;
@@ -152,7 +151,7 @@ class WebDavClient implements WebDavSyncManager.SnapshotTransport {
         connection.setRequestMethod(method);
         connection.setRequestProperty("Accept", "application/json");
 
-        if (!TextUtils.isEmpty(mUserName) || !TextUtils.isEmpty(mPassword)) {
+        if (!isEmpty(mUserName) || !isEmpty(mPassword)) {
             String credentials = mUserName + ":" + mPassword;
             String encoded = Base64.encodeToString(credentials.getBytes(StandardCharsets.UTF_8),
                     Base64.NO_WRAP);
@@ -323,6 +322,10 @@ class WebDavClient implements WebDavSyncManager.SnapshotTransport {
             throw new WebDavException(ERROR_PATH, method + " failed: " + responseCode);
         }
         throw new WebDavException(ERROR_SERVER, method + " failed: " + responseCode);
+    }
+
+    private static boolean isEmpty(String value) {
+        return value == null || value.length() == 0;
     }
 
     static class WebDavException extends IOException {
