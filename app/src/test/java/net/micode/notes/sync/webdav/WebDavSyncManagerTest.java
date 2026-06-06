@@ -17,13 +17,16 @@
 package net.micode.notes.sync.webdav;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import net.micode.notes.R;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -126,6 +129,169 @@ public class WebDavSyncManagerTest {
                 WebDavSyncManager.getResultMessageResId(WebDavSyncManager.STATE_EMPTY_URL));
     }
 
+    @Test
+    public void syncDecision_downloadsOnlyNewerRemoteWhenLocalUnchanged() throws Exception {
+        JSONObject remoteSnapshot = new JSONObject(VALID_REMOTE);
+
+        assertTrue(WebDavSyncManager.shouldDownloadRemote(remoteSnapshot, 0, false));
+        assertTrue(WebDavSyncManager.shouldReportUploadConflict(remoteSnapshot, 0, true));
+        assertFalse(WebDavSyncManager.shouldDownloadRemote(remoteSnapshot, 0, true));
+        assertFalse(WebDavSyncManager.shouldDownloadRemote(remoteSnapshot, 1, false));
+        assertFalse(WebDavSyncManager.shouldDownloadRemote(null, 0, false));
+        assertFalse(WebDavSyncManager.shouldReportUploadConflict(remoteSnapshot, 1, true));
+    }
+
+    @Test
+    public void backupFailurePreventsProviderReplacement() {
+        FakeTransport transport = new FakeTransport();
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        transport.failBackup = true;
+
+        try {
+            WebDavSyncManager.backupSnapshotSafely(transport, "local");
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement,
+                    new FakeAlarmRecovery());
+            fail("Expected backup failure");
+        } catch (IOException e) {
+            assertTrue(e instanceof WebDavSyncManager.SnapshotBackupException);
+        } catch (JSONException e) {
+            fail("Expected backup failure");
+        }
+
+        assertEquals(0, replacement.replaceCount);
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_successReschedulesAfterReplace()
+            throws Exception {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+
+        WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+
+        assertEquals("cancel", alarmRecovery.calls.get(0));
+        assertEquals("replace", replacement.calls.get(0));
+        assertEquals("reschedule", alarmRecovery.calls.get(1));
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_replaceFailureRestoresBeforeReschedule() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        replacement.replaceFailure = new RuntimeException("replace failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected replace failure");
+        } catch (RuntimeException e) {
+            assertSame(replacement.replaceFailure, e);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+
+        assertEquals("replace", replacement.calls.get(0));
+        assertEquals("restore", replacement.calls.get(1));
+        assertEquals("reschedule", alarmRecovery.calls.get(1));
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_restoreFailureSuppressesOnOriginal() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        replacement.replaceFailure = new RuntimeException("replace failed");
+        replacement.restoreFailure = new RuntimeException("restore failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected replace failure");
+        } catch (RuntimeException e) {
+            assertSame(replacement.replaceFailure, e);
+            assertEquals(1, e.getSuppressed().length);
+            assertSame(replacement.restoreFailure, e.getSuppressed()[0]);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+
+        assertEquals(1, alarmRecovery.calls.size());
+        assertEquals("cancel", alarmRecovery.calls.get(0));
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_rescheduleFailureAfterSuccessPreventsSuccess() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        alarmRecovery.rescheduleFailure = new RuntimeException("reschedule failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected reschedule failure");
+        } catch (RuntimeException e) {
+            assertSame(alarmRecovery.rescheduleFailure, e);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+
+        assertEquals(1, replacement.replaceCount);
+        assertEquals(1, alarmRecovery.rescheduleCount);
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_rescheduleFailureAfterRestoreIsSuppressed() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        replacement.replaceFailure = new RuntimeException("replace failed");
+        alarmRecovery.rescheduleFailure = new RuntimeException("reschedule failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected replace failure");
+        } catch (RuntimeException e) {
+            assertSame(replacement.replaceFailure, e);
+            assertEquals(1, e.getSuppressed().length);
+            assertSame(alarmRecovery.rescheduleFailure, e.getSuppressed()[0]);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_cancelFailureDoesNotBlockReplacement() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        alarmRecovery.cancelFailure = new RuntimeException("cancel failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected cancel failure after replacement");
+        } catch (RuntimeException e) {
+            assertSame(alarmRecovery.cancelFailure, e);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+
+        assertEquals(1, replacement.replaceCount);
+        assertEquals(1, alarmRecovery.rescheduleCount);
+    }
+
+    @Test
+    public void replaceProviderWithAlarmRecovery_importFailureKeepsImportPrimaryWhenCancelFails() {
+        FakeProviderReplacement replacement = new FakeProviderReplacement();
+        FakeAlarmRecovery alarmRecovery = new FakeAlarmRecovery();
+        replacement.replaceFailure = new RuntimeException("replace failed");
+        alarmRecovery.cancelFailure = new RuntimeException("cancel failed");
+
+        try {
+            WebDavSyncManager.replaceProviderWithAlarmRecovery(null, replacement, alarmRecovery);
+            fail("Expected replace failure");
+        } catch (RuntimeException e) {
+            assertSame(replacement.replaceFailure, e);
+            assertEquals(1, e.getSuppressed().length);
+            assertSame(alarmRecovery.cancelFailure, e.getSuppressed()[0]);
+        } catch (JSONException e) {
+            fail("Expected runtime failure");
+        }
+    }
+
     private static class FakeTransport implements WebDavSyncManager.SnapshotTransport {
         final List<String> calls = new ArrayList<String>();
 
@@ -154,6 +320,58 @@ public class WebDavSyncManagerTest {
                 throw new IOException("backup failed");
             }
             backupSnapshot = snapshot;
+        }
+    }
+
+    private static class FakeAlarmRecovery implements WebDavSyncManager.AlarmRecovery {
+        final List<String> calls = new ArrayList<String>();
+
+        RuntimeException cancelFailure;
+        RuntimeException rescheduleFailure;
+
+        int rescheduleCount;
+
+        @Override
+        public void cancelFutureProviderAlarms(android.content.Context context) {
+            calls.add("cancel");
+            if (cancelFailure != null) {
+                throw cancelFailure;
+            }
+        }
+
+        @Override
+        public void rescheduleFutureProviderAlarms(android.content.Context context) {
+            calls.add("reschedule");
+            rescheduleCount++;
+            if (rescheduleFailure != null) {
+                throw rescheduleFailure;
+            }
+        }
+    }
+
+    private static class FakeProviderReplacement implements WebDavSyncManager.ProviderReplacement {
+        final List<String> calls = new ArrayList<String>();
+
+        RuntimeException replaceFailure;
+        RuntimeException restoreFailure;
+
+        int replaceCount;
+
+        @Override
+        public void replace() {
+            calls.add("replace");
+            replaceCount++;
+            if (replaceFailure != null) {
+                throw replaceFailure;
+            }
+        }
+
+        @Override
+        public void restore() {
+            calls.add("restore");
+            if (restoreFailure != null) {
+                throw restoreFailure;
+            }
         }
     }
 }

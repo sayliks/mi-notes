@@ -176,6 +176,30 @@ public class WebDavSyncManager {
         void putBackupSnapshot(String snapshot) throws IOException;
     }
 
+    interface AlarmRecovery {
+        void cancelFutureProviderAlarms(Context context);
+
+        void rescheduleFutureProviderAlarms(Context context);
+    }
+
+    interface ProviderReplacement {
+        void replace() throws JSONException;
+
+        void restore() throws JSONException;
+    }
+
+    private static final AlarmRecovery DEFAULT_ALARM_RECOVERY = new AlarmRecovery() {
+        @Override
+        public void cancelFutureProviderAlarms(Context context) {
+            AlarmScheduler.cancelFutureProviderAlarms(context);
+        }
+
+        @Override
+        public void rescheduleFutureProviderAlarms(Context context) {
+            AlarmScheduler.rescheduleFutureProviderAlarms(context);
+        }
+    };
+
     public int sync(Context context, WebDavSyncTask asyncTask) {
         synchronized (this) {
             if (mSyncing) {
@@ -212,7 +236,7 @@ public class WebDavSyncManager {
             long remoteGeneratedAt = remoteSnapshot == null ? 0
                     : remoteSnapshot.optLong(JSON_GENERATED_AT, 0);
 
-            if (remoteSnapshot != null && remoteGeneratedAt > lastSyncTime && !localChanged) {
+            if (shouldDownloadRemote(remoteSnapshot, lastSyncTime, localChanged)) {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_downloading));
                 backupLocalSnapshot(context, client);
                 if (mCancelled) {
@@ -234,8 +258,8 @@ public class WebDavSyncManager {
                 uploadSnapshotSafely(client, remotePayload, localSnapshot.toString());
                 cleanupTrash(context);
                 resetLocalModified(context);
-                int messageResId = remoteSnapshot != null && remoteGeneratedAt > lastSyncTime
-                        && localChanged ? R.string.sync_result_uploaded_local_conflict
+                int messageResId = shouldReportUploadConflict(remoteSnapshot, lastSyncTime,
+                        localChanged) ? R.string.sync_result_uploaded_local_conflict
                         : R.string.sync_result_uploaded_local;
                 NotesPreferenceActivity.setLastSyncResult(context, STATE_SUCCESS,
                         context.getString(messageResId));
@@ -347,6 +371,22 @@ public class WebDavSyncManager {
 
     static int getTestConnectionValidationState(String url) {
         return isBlank(url) ? STATE_EMPTY_URL : STATE_SUCCESS;
+    }
+
+    static boolean shouldDownloadRemote(JSONObject remoteSnapshot, long lastSyncTime,
+            boolean localChanged) {
+        return remoteSnapshot != null && getRemoteGeneratedAt(remoteSnapshot) > lastSyncTime
+                && !localChanged;
+    }
+
+    static boolean shouldReportUploadConflict(JSONObject remoteSnapshot, long lastSyncTime,
+            boolean localChanged) {
+        return remoteSnapshot != null && getRemoteGeneratedAt(remoteSnapshot) > lastSyncTime
+                && localChanged;
+    }
+
+    private static long getRemoteGeneratedAt(JSONObject remoteSnapshot) {
+        return remoteSnapshot == null ? 0 : remoteSnapshot.optLong(JSON_GENERATED_AT, 0);
     }
 
     private int mapWebDavError(WebDavClient.WebDavException e) {
@@ -503,6 +543,22 @@ public class WebDavSyncManager {
     }
 
     private void importSnapshot(Context context, JSONObject snapshot) throws JSONException {
+        final JSONObject localSnapshot = exportSnapshot(context, true);
+        final JSONObject remoteSnapshot = snapshot;
+        replaceProviderWithAlarmRecovery(context, new ProviderReplacement() {
+            @Override
+            public void replace() throws JSONException {
+                replaceProviderFromSnapshot(context, remoteSnapshot);
+            }
+
+            @Override
+            public void restore() throws JSONException {
+                replaceProviderFromSnapshot(context, localSnapshot);
+            }
+        }, DEFAULT_ALARM_RECOVERY);
+    }
+
+    private void replaceProviderFromSnapshot(Context context, JSONObject snapshot) throws JSONException {
         JSONArray notes = snapshot.optJSONArray(JSON_NOTES);
         JSONArray data = snapshot.optJSONArray(JSON_DATA);
         if (notes == null) {
@@ -512,18 +568,111 @@ public class WebDavSyncManager {
             data = new JSONArray();
         }
 
-        AlarmScheduler.cancelFutureProviderAlarms(context);
-        try {
-            context.getContentResolver().delete(Notes.CONTENT_NOTE_URI, NoteColumns.ID + ">0", null);
-            resetFolderCounts(context);
+        context.getContentResolver().delete(Notes.CONTENT_NOTE_URI, NoteColumns.ID + ">0", null);
+        resetFolderCounts(context);
 
-            HashSet<Long> importedIds = new HashSet<Long>();
-            importNotesByType(context, notes, Notes.TYPE_FOLDER, importedIds);
-            importNotesByType(context, notes, Notes.TYPE_NOTE, importedIds);
-            importData(context, data, importedIds);
-            resetLocalModified(context);
-        } finally {
-            AlarmScheduler.rescheduleFutureProviderAlarms(context);
+        HashSet<Long> importedIds = new HashSet<Long>();
+        importNotesByType(context, notes, Notes.TYPE_FOLDER, importedIds);
+        importNotesByType(context, notes, Notes.TYPE_NOTE, importedIds);
+        importData(context, data, importedIds);
+        resetLocalModified(context);
+    }
+
+    static void replaceProviderWithAlarmRecovery(Context context, ProviderReplacement replacement,
+            AlarmRecovery alarmRecovery) throws JSONException {
+        RuntimeException cancelFailure = null;
+        try {
+            alarmRecovery.cancelFutureProviderAlarms(context);
+        } catch (RuntimeException e) {
+            cancelFailure = e;
+            logAlarmRecoveryFailure("Unable to cancel old alarms before WebDAV import", e);
+        }
+
+        try {
+            replacement.replace();
+        } catch (JSONException e) {
+            handleProviderReplacementFailure(context, replacement, alarmRecovery, e,
+                    cancelFailure);
+            return;
+        } catch (RuntimeException e) {
+            handleProviderReplacementFailure(context, replacement, alarmRecovery, e,
+                    cancelFailure);
+            return;
+        }
+
+        rescheduleAfterSuccessfulReplacement(context, alarmRecovery, cancelFailure);
+    }
+
+    private static void rescheduleAfterSuccessfulReplacement(Context context,
+            AlarmRecovery alarmRecovery, RuntimeException cancelFailure) {
+        RuntimeException rescheduleFailure = null;
+        try {
+            alarmRecovery.rescheduleFutureProviderAlarms(context);
+        } catch (RuntimeException e) {
+            rescheduleFailure = e;
+            logAlarmRecoveryFailure("WebDAV import succeeded but alarm reschedule failed", e);
+        }
+        RuntimeException alarmFailure = mergeAlarmRecoveryFailures(cancelFailure,
+                rescheduleFailure);
+        if (alarmFailure != null) {
+            throw alarmFailure;
+        }
+    }
+
+    private static void handleProviderReplacementFailure(Context context,
+            ProviderReplacement replacement, AlarmRecovery alarmRecovery, Throwable primary,
+            RuntimeException cancelFailure) throws JSONException {
+        if (cancelFailure != null && cancelFailure != primary) {
+            primary.addSuppressed(cancelFailure);
+        }
+        boolean restored = false;
+        try {
+            replacement.restore();
+            restored = true;
+        } catch (JSONException e) {
+            primary.addSuppressed(e);
+        } catch (RuntimeException e) {
+            primary.addSuppressed(e);
+        }
+
+        if (restored) {
+            try {
+                alarmRecovery.rescheduleFutureProviderAlarms(context);
+            } catch (RuntimeException e) {
+                primary.addSuppressed(e);
+                logAlarmRecoveryFailure("Restored local snapshot but alarm reschedule failed", e);
+            }
+        }
+
+        rethrowProviderReplacementFailure(primary);
+    }
+
+    private static RuntimeException mergeAlarmRecoveryFailures(RuntimeException cancelFailure,
+            RuntimeException rescheduleFailure) {
+        if (rescheduleFailure != null) {
+            if (cancelFailure != null && cancelFailure != rescheduleFailure) {
+                rescheduleFailure.addSuppressed(cancelFailure);
+            }
+            return rescheduleFailure;
+        }
+        return cancelFailure;
+    }
+
+    private static void rethrowProviderReplacementFailure(Throwable failure) throws JSONException {
+        if (failure instanceof JSONException) {
+            throw (JSONException) failure;
+        }
+        if (failure instanceof RuntimeException) {
+            throw (RuntimeException) failure;
+        }
+        throw new RuntimeException(failure);
+    }
+
+    private static void logAlarmRecoveryFailure(String message, RuntimeException error) {
+        try {
+            Log.e(TAG, message, error);
+        } catch (RuntimeException ignored) {
+            // Local JVM tests use Android stubs; never let logging replace the primary failure.
         }
     }
 
