@@ -104,6 +104,10 @@ class WebDavClient {
         putJson(getSnapshotUrl(), snapshot);
     }
 
+    void putBackupSnapshot(String snapshot, long timestamp) throws IOException {
+        putJson(getBackupUrl(timestamp), snapshot);
+    }
+
     private void putJson(URL url, String snapshot) throws IOException {
         HttpURLConnection connection = openConnection("PUT", url);
         connection.setDoOutput(true);
@@ -163,6 +167,28 @@ class WebDavClient {
                 trimmedUrl += "/";
             }
             return new URL(trimmedUrl + SNAPSHOT_FILE_NAME);
+        } catch (MalformedURLException e) {
+            throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
+        }
+    }
+
+    private URL getBackupUrl(long timestamp) throws IOException {
+        String trimmedUrl = mUrl == null ? "" : mUrl.trim();
+        String backupSuffix = ".backup-" + timestamp + ".json";
+        try {
+            if (trimmedUrl.toLowerCase(Locale.US).endsWith(".json")) {
+                int slashIndex = trimmedUrl.lastIndexOf('/');
+                String parent = slashIndex >= 0 ? trimmedUrl.substring(0, slashIndex + 1) : "";
+                String fileName = slashIndex >= 0 ? trimmedUrl.substring(slashIndex + 1)
+                        : trimmedUrl;
+                return new URL(parent + fileName.substring(0, fileName.length() - 5)
+                        + backupSuffix);
+            }
+            if (!trimmedUrl.endsWith("/")) {
+                trimmedUrl += "/";
+            }
+            return new URL(trimmedUrl + SNAPSHOT_FILE_NAME.substring(0,
+                    SNAPSHOT_FILE_NAME.length() - 5) + backupSuffix);
         } catch (MalformedURLException e) {
             throw new WebDavException(ERROR_INVALID_URL, "Invalid WebDAV URL");
         }

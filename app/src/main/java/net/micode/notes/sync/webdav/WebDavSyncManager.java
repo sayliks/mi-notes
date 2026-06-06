@@ -207,6 +207,7 @@ public class WebDavSyncManager {
 
             if (remoteSnapshot != null && remoteGeneratedAt > lastSyncTime && !localChanged) {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_downloading));
+                backupLocalSnapshot(context, client);
                 if (mCancelled) {
                     NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
                             context.getString(R.string.sync_result_cancelled));
@@ -217,6 +218,7 @@ public class WebDavSyncManager {
                         context.getString(R.string.sync_result_downloaded_remote));
             } else {
                 asyncTask.publishProgressMessage(context.getString(R.string.sync_progress_webdav_uploading));
+                backupRemoteSnapshot(client, remotePayload);
                 JSONObject localSnapshot = exportSnapshot(context);
                 if (mCancelled) {
                     NotesPreferenceActivity.setLastSyncResult(context, STATE_SYNC_CANCELLED,
@@ -341,6 +343,19 @@ public class WebDavSyncManager {
             default:
                 return STATE_NETWORK_ERROR;
         }
+    }
+
+    private void backupRemoteSnapshot(WebDavClient client, String remotePayload)
+            throws IOException {
+        if (!TextUtils.isEmpty(remotePayload)) {
+            client.putBackupSnapshot(remotePayload, System.currentTimeMillis());
+        }
+    }
+
+    private void backupLocalSnapshot(Context context, WebDavClient client)
+            throws IOException, JSONException {
+        client.putBackupSnapshot(exportSnapshot(context, true).toString(),
+                System.currentTimeMillis());
     }
 
     private boolean hasLocalChanges(Context context) {
