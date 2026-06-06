@@ -9,10 +9,11 @@
 | 文件 | 责任 |
 |---|---|
 | `app/src/main/java/net/micode/notes/model/WorkingNote.java` | `setAlertDate()` 写入 `NoteColumns.ALERTED_DATE` 并通知编辑页调度闹钟。 |
-| `app/src/main/java/net/micode/notes/ui/NoteEditActivity.java` | `setReminder()` 打开时间选择器；`onClockAlertChanged()` 保存未入库便签，并通过 `AlarmManager` 调度或取消提醒。 |
-| `app/src/main/java/net/micode/notes/ui/AlarmReceiver.java` | 统一构造提醒 `PendingIntent`，解析 provider note URI / `Intent.EXTRA_UID`，并启动提醒弹窗。 |
+| `app/src/main/java/net/micode/notes/ui/AlarmScheduler.java` | 闹钟调度边界：调度、取消、批量重建 provider 中未来且可见的提醒。 |
+| `app/src/main/java/net/micode/notes/ui/NoteEditActivity.java` | `setReminder()` 打开时间选择器；`onClockAlertChanged()` 保存未入库便签，并委托 `AlarmScheduler` 调度或取消提醒。删除或移入回收站前也会取消提醒。 |
+| `app/src/main/java/net/micode/notes/ui/AlarmReceiver.java` | 构造提醒 intent，解析 provider note URI / `Intent.EXTRA_UID`，并拒绝无效 note id。 |
 | `app/src/main/java/net/micode/notes/ui/AlarmAlertActivity.java` | 从 provider-backed `DataUtils` 读取 snippet，确认便签未进回收站后显示弹窗并播放提醒声音。 |
-| `app/src/main/java/net/micode/notes/ui/AlarmInitReceiver.java` | 收到开机广播后查询 provider 中未来的 `ALERTED_DATE`，重新注册 `AlarmManager` 提醒。 |
+| `app/src/main/java/net/micode/notes/ui/AlarmInitReceiver.java` | 收到开机广播后使用 `goAsync()`，在后台线程委托 `AlarmScheduler` 重建提醒。 |
 | `app/src/debug/java/net/micode/notes/ui/AlarmDebugReceiver.java` | Debug-only 手动触发入口，用于安全验证提醒弹窗，不进入 release APK。 |
 
 闹钟 `PendingIntent` 的稳定格式是：
@@ -59,6 +60,15 @@ adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.mic
 adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.micode.notes/.ui.AlarmDebugReceiver -d content://micode_notes/note/<NOTE_ID>
 ```
 
+错误输入应被拒绝且不崩溃：
+
+```powershell
+adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.micode.notes/.ui.AlarmDebugReceiver
+adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.micode.notes/.ui.AlarmDebugReceiver --el android.intent.extra.UID 0
+adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.micode.notes/.ui.AlarmDebugReceiver -d content://micode_notes/data/not-a-note
+adb shell am broadcast -a net.micode.notes.action.DEBUG_TRIGGER_ALARM -n net.micode.notes/.ui.AlarmDebugReceiver -d content://other_authority/note/1
+```
+
 获取已调度提醒的 note id，可先按正常路径设置提醒，然后查看系统 alarm 队列：
 
 ```powershell
@@ -76,6 +86,44 @@ adb shell am broadcast -a android.intent.action.BOOT_COMPLETED -n net.micode.not
 ```
 
 部分系统会限制手动发送 protected broadcast；如果被拦截，以真实重启结果为准。
+
+批量验证时，准备大量未来提醒后执行：
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest --tests net.micode.notes.ui.AlarmInitReceiverInstrumentedTest
+adb shell dumpsys alarm | Select-String micode_notes
+```
+
+预期：只有未来、普通便签、且不在回收站的提醒会被重建；日志中会输出重建数量和耗时。
+
+### 删除 / 回收站提醒
+
+1. 给测试便签设置未来提醒。
+2. 删除便签，或在 WebDAV 同步模式下将便签移入回收站。
+3. 查看 `dumpsys alarm`，确认对应 `content://micode_notes/note/<NOTE_ID>` 不再存在。
+4. 使用 debug trigger 触发同一 note id，预期不会显示提醒弹窗。
+
+### WebDAV 导入提醒
+
+WebDAV 快照中的 `ALERTED_DATE` 与便签内容使用同一冲突契约：远端较新且本地未改动时下载远端，否则上传本地。导入远端快照时，应用会先取消当前 provider 中未来提醒，再按导入后的 provider 数据重建未来且可见的提醒。
+
+验证步骤：
+
+1. 本机设置未来提醒并确认 alarm 队列中存在对应 note id。
+2. 导入一个不包含该提醒或将该便签移入回收站的 WebDAV 快照。
+3. 确认旧提醒被取消。
+4. 导入一个包含未来 `ALERTED_DATE` 的快照。
+5. 确认导入后的 note id 被重新调度。
+
+### Release manifest 检查
+
+Debug trigger 只能存在于 debug source set。发布前运行：
+
+```powershell
+.\gradlew.bat :app:verifyReleaseManifestNoDebugAlarm
+```
+
+预期：release manifest 中不包含 `net.micode.notes.action.DEBUG_TRIGGER_ALARM` 或 `net.micode.notes.ui.AlarmDebugReceiver`。
 
 ### 小组件验证
 
@@ -97,5 +145,7 @@ adb shell am broadcast -a android.appwidget.action.APPWIDGET_UPDATE -n net.micod
 - 设置提醒后，列表、编辑页、弹窗内容来自同一条 provider 记录。
 - 便签移动到回收站后，旧提醒不会显示弹窗。
 - 重启后，未来提醒会重新注册。
+- 大量提醒重建不会阻塞 `AlarmInitReceiver` 主线程。
+- 无效 URI、缺失 note id、回收站 note id 不会让提醒页面崩溃。
 - 小组件显示最新 provider snippet，点击打开正确 note id。
 - WebDAV 同步导入后，提醒和小组件仍按 legacy 字段 `ALERTED_DATE`、`WIDGET_ID`、`WIDGET_TYPE` 工作。

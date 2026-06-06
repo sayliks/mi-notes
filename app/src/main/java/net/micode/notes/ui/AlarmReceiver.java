@@ -59,11 +59,6 @@ public class AlarmReceiver extends BroadcastReceiver {
         return intent;
     }
 
-    public static PendingIntent createPendingIntent(Context context, long noteId) {
-        return PendingIntent.getBroadcast(context, 0, createAlarmIntent(context, noteId),
-                getPendingIntentFlags());
-    }
-
     public static long getNoteId(Intent intent) {
         if (intent == null) {
             return INVALID_NOTE_ID;
@@ -78,11 +73,18 @@ public class AlarmReceiver extends BroadcastReceiver {
         if (extras == null || !extras.containsKey(Intent.EXTRA_UID)) {
             return INVALID_NOTE_ID;
         }
-        return parsePositiveLong(extras.get(Intent.EXTRA_UID));
+        return getNoteIdFromExtraValue(extras.get(Intent.EXTRA_UID));
     }
 
     public static Uri createNoteUri(long noteId) {
+        if (!isValidNoteId(noteId)) {
+            throw new IllegalArgumentException("Alarm note id must be positive: " + noteId);
+        }
         return ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId);
+    }
+
+    static boolean isValidNoteId(long noteId) {
+        return noteId > 0;
     }
 
     private static long getNoteId(Uri data) {
@@ -93,22 +95,22 @@ public class AlarmReceiver extends BroadcastReceiver {
     }
 
     static long getNoteIdFromPathSegments(String authority, List<String> pathSegments) {
-        if (!Notes.AUTHORITY.equals(authority) || pathSegments == null || pathSegments.size() < 2
+        if (!Notes.AUTHORITY.equals(authority) || pathSegments == null || pathSegments.size() != 2
                 || !NOTE_PATH_SEGMENT.equals(pathSegments.get(0))) {
             return INVALID_NOTE_ID;
         }
-        return parsePositiveLong(pathSegments.get(1));
+        return getNoteIdFromExtraValue(pathSegments.get(1));
     }
 
-    private static long parsePositiveLong(Object value) {
+    static long getNoteIdFromExtraValue(Object value) {
         if (value instanceof Number) {
             long noteId = ((Number) value).longValue();
-            return noteId > 0 ? noteId : INVALID_NOTE_ID;
+            return isValidNoteId(noteId) ? noteId : INVALID_NOTE_ID;
         }
         if (value instanceof String) {
             try {
                 long noteId = Long.parseLong((String) value);
-                return noteId > 0 ? noteId : INVALID_NOTE_ID;
+                return isValidNoteId(noteId) ? noteId : INVALID_NOTE_ID;
             } catch (NumberFormatException e) {
                 return INVALID_NOTE_ID;
             }
@@ -116,7 +118,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         return INVALID_NOTE_ID;
     }
 
-    private static int getPendingIntentFlags() {
+    static int getPendingIntentFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;

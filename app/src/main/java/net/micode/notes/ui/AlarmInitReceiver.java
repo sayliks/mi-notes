@@ -16,65 +16,32 @@
 
 package net.micode.notes.ui;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.util.Log;
-
-import net.micode.notes.data.Notes;
-import net.micode.notes.data.Notes.NoteColumns;
-
 
 public class AlarmInitReceiver extends BroadcastReceiver {
     private static final String TAG = "AlarmInitReceiver";
 
-    private static final String [] PROJECTION = new String [] {
-        NoteColumns.ID,
-        NoteColumns.ALERTED_DATE
-    };
-
-    private static final int COLUMN_ID                = 0;
-    private static final int COLUMN_ALERTED_DATE      = 1;
-
     @Override
-    public void onReceive(Context context, Intent intent) {
-        rescheduleAlarms(context);
+    public void onReceive(final Context context, Intent intent) {
+        final PendingResult pendingResult = goAsync();
+        final Context appContext = context.getApplicationContext();
+        AlarmScheduler.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int scheduled = AlarmScheduler.rescheduleFutureProviderAlarms(appContext);
+                    Log.i(TAG, "Boot rescheduled " + scheduled + " alarms");
+                } finally {
+                    pendingResult.finish();
+                }
+            }
+        });
     }
 
     public static int rescheduleAlarms(Context context) {
-        long currentDate = System.currentTimeMillis();
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (alarmManager == null) {
-            Log.e(TAG, "Alarm service is unavailable");
-            return 0;
-        }
-
-        Cursor c = context.getContentResolver().query(Notes.CONTENT_NOTE_URI,
-                PROJECTION,
-                NoteColumns.ALERTED_DATE + ">? AND " + NoteColumns.TYPE + "=" + Notes.TYPE_NOTE,
-                new String[] { String.valueOf(currentDate) },
-                null);
-
-        int scheduledCount = 0;
-        if (c != null) {
-            try {
-                if (c.moveToFirst()) {
-                    do {
-                        long alertDate = c.getLong(COLUMN_ALERTED_DATE);
-                        long noteId = c.getLong(COLUMN_ID);
-                        PendingIntent pendingIntent =
-                                AlarmReceiver.createPendingIntent(context, noteId);
-                        alarmManager.set(AlarmManager.RTC_WAKEUP, alertDate, pendingIntent);
-                        scheduledCount++;
-                    } while (c.moveToNext());
-                }
-            } finally {
-                c.close();
-            }
-        }
-        return scheduledCount;
+        return AlarmScheduler.rescheduleFutureProviderAlarms(context);
     }
 }

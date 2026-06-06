@@ -27,6 +27,7 @@ import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.DataColumns;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.tool.DataUtils;
+import net.micode.notes.ui.AlarmScheduler;
 import net.micode.notes.ui.NotesPreferenceActivity;
 
 import org.json.JSONArray;
@@ -511,14 +512,19 @@ public class WebDavSyncManager {
             data = new JSONArray();
         }
 
-        context.getContentResolver().delete(Notes.CONTENT_NOTE_URI, NoteColumns.ID + ">0", null);
-        resetFolderCounts(context);
+        AlarmScheduler.cancelFutureProviderAlarms(context);
+        try {
+            context.getContentResolver().delete(Notes.CONTENT_NOTE_URI, NoteColumns.ID + ">0", null);
+            resetFolderCounts(context);
 
-        HashSet<Long> importedIds = new HashSet<Long>();
-        importNotesByType(context, notes, Notes.TYPE_FOLDER, importedIds);
-        importNotesByType(context, notes, Notes.TYPE_NOTE, importedIds);
-        importData(context, data, importedIds);
-        resetLocalModified(context);
+            HashSet<Long> importedIds = new HashSet<Long>();
+            importNotesByType(context, notes, Notes.TYPE_FOLDER, importedIds);
+            importNotesByType(context, notes, Notes.TYPE_NOTE, importedIds);
+            importData(context, data, importedIds);
+            resetLocalModified(context);
+        } finally {
+            AlarmScheduler.rescheduleFutureProviderAlarms(context);
+        }
     }
 
     private void importNotesByType(Context context, JSONArray notes, int type,

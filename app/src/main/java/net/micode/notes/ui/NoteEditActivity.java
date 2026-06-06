@@ -19,8 +19,6 @@ package net.micode.notes.ui;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.app.SearchManager;
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
@@ -605,6 +603,7 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             long id = mWorkingNote.getNoteId();
             if (id != Notes.ID_ROOT_FOLDER) {
                 ids.add(id);
+                AlarmScheduler.cancelNote(this, id);
             } else {
                 Log.d(TAG, "Wrong note id, should not happen");
             }
@@ -634,14 +633,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             saveNote();
         }
         if (mWorkingNote.getNoteId() > 0) {
-            PendingIntent pendingIntent =
-                    AlarmReceiver.createPendingIntent(this, mWorkingNote.getNoteId());
-            AlarmManager alarmManager = ((AlarmManager) getSystemService(ALARM_SERVICE));
             showAlertHeader();
             if(!set) {
-                alarmManager.cancel(pendingIntent);
+                AlarmScheduler.cancelNote(this, mWorkingNote.getNoteId());
             } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, date, pendingIntent);
+                AlarmScheduler.scheduleNote(this, mWorkingNote.getNoteId(), date);
             }
         } else {
             /**

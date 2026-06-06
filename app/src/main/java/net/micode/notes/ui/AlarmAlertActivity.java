@@ -71,6 +71,12 @@ public class AlarmAlertActivity extends AppCompatActivity implements OnClickList
             return;
         }
 
+        if (!DataUtils.visibleInNoteDatabase(getContentResolver(), mNoteId, Notes.TYPE_NOTE)) {
+            Log.i(TAG, "Ignore alarm for invisible or stale note id: " + mNoteId);
+            finish();
+            return;
+        }
+
         try {
             mSnippet = DataUtils.getSnippetById(this.getContentResolver(), mNoteId);
             if (mSnippet == null) {
@@ -86,12 +92,8 @@ public class AlarmAlertActivity extends AppCompatActivity implements OnClickList
         }
 
         mPlayer = new MediaPlayer();
-        if (DataUtils.visibleInNoteDatabase(getContentResolver(), mNoteId, Notes.TYPE_NOTE)) {
-            showActionDialog();
-            playAlarmSound();
-        } else {
-            finish();
-        }
+        showActionDialog();
+        playAlarmSound();
     }
 
     private boolean isScreenOn() {
