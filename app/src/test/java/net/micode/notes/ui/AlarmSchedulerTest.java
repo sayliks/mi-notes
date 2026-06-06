@@ -2,6 +2,9 @@ package net.micode.notes.ui;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import android.content.Context;
 
 import net.micode.notes.data.Notes;
 
@@ -42,12 +45,47 @@ public class AlarmSchedulerTest {
         reminders.add(reminder(5, now + 1, Notes.TYPE_FOLDER, Notes.ID_ROOT_FOLDER));
         reminders.add(reminder(0, now + 1, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
         reminders.add(reminder(-1, now + 1, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
+        reminders.add(reminder(6, 0, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
+        reminders.add(reminder(7, -1, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
 
         FakeAlarmRegistrar registrar = new FakeAlarmRegistrar();
 
         assertEquals(1, AlarmScheduler.rescheduleReminders(reminders, now, registrar));
         assertEquals(1, registrar.scheduledIds.size());
         assertTrue(registrar.scheduledIds.contains(1L));
+    }
+
+    @Test
+    public void rescheduleReminders_countsDuplicateRowsAsSeparateScheduleRequests() {
+        long now = 1000;
+        List<AlarmScheduler.Reminder> reminders = new ArrayList<AlarmScheduler.Reminder>();
+        reminders.add(reminder(1, now + 1, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
+        reminders.add(reminder(1, now + 2, Notes.TYPE_NOTE, Notes.ID_ROOT_FOLDER));
+
+        FakeAlarmRegistrar registrar = new FakeAlarmRegistrar();
+
+        assertEquals(2, AlarmScheduler.rescheduleReminders(reminders, now, registrar));
+        assertEquals(2, registrar.scheduleCount);
+        assertEquals(1, registrar.scheduledIds.size());
+    }
+
+    @Test
+    public void rescheduleFutureProviderAlarms_propagatesProviderQueryFailure() {
+        final RuntimeException queryFailure = new RuntimeException("query failed");
+        FakeAlarmRegistrar registrar = new FakeAlarmRegistrar();
+        AlarmScheduler.ReminderReader failingReader = new AlarmScheduler.ReminderReader() {
+            @Override
+            public List<AlarmScheduler.Reminder> read(Context context, long now) {
+                throw queryFailure;
+            }
+        };
+
+        try {
+            AlarmScheduler.rescheduleFutureProviderAlarms(null, registrar, 1000, failingReader);
+            fail("Expected provider query failure");
+        } catch (RuntimeException e) {
+            assertEquals(queryFailure, e);
+        }
     }
 
     @Test
@@ -72,9 +110,11 @@ public class AlarmSchedulerTest {
     private static class FakeAlarmRegistrar implements AlarmScheduler.AlarmRegistrar {
         final HashSet<Long> scheduledIds = new HashSet<Long>();
         final HashSet<Long> cancelledIds = new HashSet<Long>();
+        int scheduleCount;
 
         @Override
         public void schedule(long noteId, long alertDate) {
+            scheduleCount++;
             scheduledIds.add(noteId);
         }
 

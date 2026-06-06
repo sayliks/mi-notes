@@ -98,14 +98,19 @@ public final class AlarmScheduler {
     }
 
     static int rescheduleFutureProviderAlarms(Context context, AlarmRegistrar registrar, long now) {
+        return rescheduleFutureProviderAlarms(context, registrar, now, PROVIDER_REMINDER_READER);
+    }
+
+    static int rescheduleFutureProviderAlarms(Context context, AlarmRegistrar registrar, long now,
+            ReminderReader reminderReader) {
         if (registrar == null) {
             Log.e(TAG, "Alarm service is unavailable");
             return 0;
         }
-        long start = SystemClock.elapsedRealtime();
-        int scheduled = rescheduleReminders(readFutureReminders(context, now), now, registrar);
+        long start = elapsedRealtime();
+        int scheduled = rescheduleReminders(reminderReader.read(context, now), now, registrar);
         Log.i(TAG, "Rescheduled " + scheduled + " alarms in "
-                + (SystemClock.elapsedRealtime() - start) + " ms");
+                + (elapsedRealtime() - start) + " ms");
         return scheduled;
     }
 
@@ -114,10 +119,10 @@ public final class AlarmScheduler {
             Log.e(TAG, "Alarm service is unavailable");
             return 0;
         }
-        long start = SystemClock.elapsedRealtime();
+        long start = elapsedRealtime();
         int cancelled = cancelReminders(readFutureReminders(context, now), registrar);
         Log.i(TAG, "Cancelled " + cancelled + " alarms in "
-                + (SystemClock.elapsedRealtime() - start) + " ms");
+                + (elapsedRealtime() - start) + " ms");
         return cancelled;
     }
 
@@ -185,10 +190,22 @@ public final class AlarmScheduler {
         return new SystemAlarmRegistrar(context.getApplicationContext(), alarmManager);
     }
 
+    private static long elapsedRealtime() {
+        try {
+            return SystemClock.elapsedRealtime();
+        } catch (RuntimeException e) {
+            return System.currentTimeMillis();
+        }
+    }
+
     interface AlarmRegistrar {
         void schedule(long noteId, long alertDate);
 
         void cancel(long noteId);
+    }
+
+    interface ReminderReader {
+        List<Reminder> read(Context context, long now);
     }
 
     static final class Reminder {
@@ -204,6 +221,13 @@ public final class AlarmScheduler {
             this.parentId = parentId;
         }
     }
+
+    private static final ReminderReader PROVIDER_REMINDER_READER = new ReminderReader() {
+        @Override
+        public List<Reminder> read(Context context, long now) {
+            return readFutureReminders(context, now);
+        }
+    };
 
     private static final class SystemAlarmRegistrar implements AlarmRegistrar {
         private final Context context;

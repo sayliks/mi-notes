@@ -43,7 +43,11 @@ public class NotesApplication extends Application {
 
     private boolean isMainProcess() {
         String processName = getCurrentProcessName(this);
-        return processName == null || getPackageName().equals(processName);
+        return isMainProcessName(getPackageName(), processName);
+    }
+
+    static boolean isMainProcessName(String packageName, String processName) {
+        return processName == null || packageName.equals(processName);
     }
 
     static String getCurrentProcessName(Context context) {

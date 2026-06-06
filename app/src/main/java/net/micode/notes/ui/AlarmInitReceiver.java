@@ -28,17 +28,24 @@ public class AlarmInitReceiver extends BroadcastReceiver {
     public void onReceive(final Context context, Intent intent) {
         final PendingResult pendingResult = goAsync();
         final Context appContext = context.getApplicationContext();
-        AlarmScheduler.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    int scheduled = AlarmScheduler.rescheduleFutureProviderAlarms(appContext);
-                    Log.i(TAG, "Boot rescheduled " + scheduled + " alarms");
-                } finally {
-                    pendingResult.finish();
+        try {
+            AlarmScheduler.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        int scheduled = AlarmScheduler.rescheduleFutureProviderAlarms(appContext);
+                        Log.i(TAG, "Boot rescheduled " + scheduled + " alarms");
+                    } catch (RuntimeException e) {
+                        Log.e(TAG, "Boot alarm reschedule failed", e);
+                    } finally {
+                        pendingResult.finish();
+                    }
                 }
-            }
-        });
+            });
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Unable to enqueue boot alarm reschedule", e);
+            pendingResult.finish();
+        }
     }
 
     public static int rescheduleAlarms(Context context) {
