@@ -4,6 +4,8 @@
 
 迁移阶段仍以 legacy `NotesProvider` / `note.db` 为权威数据源。闹钟、小组件和搜索一样，不直接读写 Room。Room 只是列表 UI 的兼容读模型，由 `NotesRepository` 从 provider 后台刷新。
 
+`NotesApplication` 只在主进程初始化 Room mirror。`AlarmReceiver` 所在的 remote 进程继续通过 provider / `DataUtils` 读取 legacy 数据，不应直接访问未初始化的 Room mirror。Android 9+ 使用 `Application.getProcessName()` 判断进程名；更低版本通过 `ActivityManager` 查找当前 pid。
+
 ## 闹钟定义与调度
 
 | 文件 | 责任 |
@@ -23,6 +25,27 @@ content://micode_notes/note/<NOTE_ID>
 ```
 
 这个 URI 仍指向 provider 中的 legacy note id，不能改成 Room id 或直接数据库路径。
+
+`PendingIntent` 身份契约：
+
+- component：`net.micode.notes.ui.AlarmReceiver`
+- action：空
+- data：`content://micode_notes/note/<NOTE_ID>`
+- requestCode：`0`
+- flags：`FLAG_UPDATE_CURRENT`；Android 6.0+ 额外包含 `FLAG_IMMUTABLE`
+- extras：不参与身份匹配，只作为旧入口兼容解析
+
+note id 通过 data URI 路径保存，不映射到 requestCode。因此 long note id 不会因为 requestCode 截断发生碰撞；不同 note id 的 `PendingIntent` 由不同 data URI 区分。更新提醒时间会使用同一个身份覆盖旧闹钟，删除或移入回收站会取消同一个身份。
+
+批量重建提醒的 provider 过滤契约：
+
+```sql
+ALERTED_DATE > now
+AND TYPE = TYPE_NOTE
+AND PARENT_ID <> ID_TRASH_FOLER
+```
+
+这表示时间为 `0`、负数、过去时间、文件夹、回收站便签、无效 note id 都不会被重建。当前策略不会在开机或同步后补弹已经错过的提醒；错过的提醒会被跳过，保持现有行为。
 
 ## 小组件定义与更新
 
@@ -106,6 +129,18 @@ adb shell dumpsys alarm | Select-String micode_notes
 ### WebDAV 导入提醒
 
 WebDAV 快照中的 `ALERTED_DATE` 与便签内容使用同一冲突契约：远端较新且本地未改动时下载远端，否则上传本地。导入远端快照时，应用会先取消当前 provider 中未来提醒，再按导入后的 provider 数据重建未来且可见的提醒。
+
+WebDAV provider 替换和闹钟恢复顺序：
+
+1. 在替换 provider 前导出本地快照，作为失败回滚数据。
+2. 先取消当前 provider 中未来且可见的提醒。
+3. 替换 provider 数据。
+4. 替换成功后，按最终 provider 状态重建未来且可见的提醒。
+5. 替换失败时，先用本地快照恢复 provider；恢复成功后再重建提醒。
+6. 如果恢复失败，不会基于部分替换状态重建提醒；原始替换异常保留，恢复异常作为 suppressed failure 附加。
+7. 如果 provider 替换已经成功但提醒取消或重建失败，同步不会报告成功；数据可能已经提交，但提醒状态不确定，失败会继续向上报告。
+
+`AlarmManager.cancel()` 没有返回值，因此无法表示单条取消的部分失败。可表示的取消或重建异常会被记录；provider 替换异常始终是主异常，不会被闹钟恢复异常覆盖。若 provider 替换失败，恢复失败或提醒重建失败会作为 suppressed failure 附加到原始替换异常。
 
 验证步骤：
 
