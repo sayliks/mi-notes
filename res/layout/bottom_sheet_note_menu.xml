@@ -157,4 +157,29 @@
             android:text="@string/menu_send_to_desktop"
             android:textSize="16sp" />
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/bottom_menu_encrypt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/ic_lock_lock"
+            android:layout_marginEnd="16dp" />
+
+        <TextView
+            android:id="@+id/bottom_menu_encrypt_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_encrypt"
+            android:textSize="16sp" />
+    </LinearLayout>
 </LinearLayout>

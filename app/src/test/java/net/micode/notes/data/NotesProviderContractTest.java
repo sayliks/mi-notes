@@ -291,6 +291,39 @@ public class NotesProviderContractTest {
         assertSystemFolderExists(Notes.ID_TRASH_FOLER);
     }
 
+    // --- Encrypted column ---
+
+    @Test
+    public void insertNote_defaultNotEncrypted() {
+        long noteId = insertNote(1400, Notes.ID_ROOT_FOLDER, Notes.TYPE_NOTE, "normal");
+
+        Cursor c = db.query(NotesDatabaseHelper.TABLE.NOTE,
+                new String[]{NoteColumns.ENCRYPTED},
+                NoteColumns.ID + "=?", new String[]{String.valueOf(noteId)},
+                null, null, null);
+        assertTrue(c.moveToFirst());
+        assertEquals(0, c.getInt(c.getColumnIndex(NoteColumns.ENCRYPTED)));
+        c.close();
+    }
+
+    @Test
+    public void updateNote_setEncrypted() {
+        long noteId = insertNote(1500, Notes.ID_ROOT_FOLDER, Notes.TYPE_NOTE, "will encrypt");
+
+        ContentValues values = new ContentValues();
+        values.put(NoteColumns.ENCRYPTED, 1);
+        db.update(NotesDatabaseHelper.TABLE.NOTE, values,
+                NoteColumns.ID + "=?", new String[]{String.valueOf(noteId)});
+
+        Cursor c = db.query(NotesDatabaseHelper.TABLE.NOTE,
+                new String[]{NoteColumns.ENCRYPTED},
+                NoteColumns.ID + "=?", new String[]{String.valueOf(noteId)},
+                null, null, null);
+        assertTrue(c.moveToFirst());
+        assertEquals(1, c.getInt(c.getColumnIndex(NoteColumns.ENCRYPTED)));
+        c.close();
+    }
+
     // --- Helpers ---
 
     private long insertNote(long id, long parentId, int type, String snippet) {

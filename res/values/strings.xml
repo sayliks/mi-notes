@@ -168,6 +168,24 @@
     <string name="datetime_dialog_ok">set</string>
     <string name="datetime_dialog_cancel">cancel</string>
     <string name="error_crash_prefix">Crash: %1$s</string>
+    <!-- Encryption -->
+    <string name="menu_encrypt">Encrypt note</string>
+    <string name="menu_decrypt">Decrypt note</string>
+    <string name="encrypted_placeholder">[Encrypted]</string>
+    <string name="dialog_enter_password">Enter password</string>
+    <string name="dialog_set_password">Set password</string>
+    <string name="dialog_confirm_password">Confirm password</string>
+    <string name="dialog_new_password">New password</string>
+    <string name="dialog_password_mismatch">Passwords do not match</string>
+    <string name="dialog_wrong_password">Wrong password</string>
+    <string name="dialog_password_required">Please set a password first in Settings</string>
+    <string name="preferences_encryption_title">Private notes</string>
+    <string name="preferences_set_password">Set password</string>
+    <string name="preferences_change_password">Change password</string>
+    <string name="preferences_clear_password">Clear password</string>
+    <string name="preferences_encryption_summary">Protect private notes with a password</string>
+    <string name="preferences_password_set">Password set</string>
+    <string name="preferences_password_cleared">Password cleared</string>
     <plurals name="search_results_title">
          <item quantity="one"><xliff:g id="number" example="1">%1$s</xliff:g> result for \"<xliff:g id="search" example="???">%2$s</xliff:g>\"</item>
         <!-- Case of 0 or 2 or more results. -->

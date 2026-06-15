@@ -15,7 +15,7 @@ import net.micode.notes.data.entity.NoteTagCrossRef;
 /**
  * Room database singleton.
  */
-@Database(entities = {NoteEntity.class, TagEntity.class, NoteTagCrossRef.class}, version = 2, exportSchema = false)
+@Database(entities = {NoteEntity.class, TagEntity.class, NoteTagCrossRef.class}, version = 3, exportSchema = false)
 public abstract class NotesDatabase extends RoomDatabase {
     private static NotesDatabase INSTANCE;
 
@@ -27,11 +27,18 @@ public abstract class NotesDatabase extends RoomDatabase {
         }
     };
 
+    static final Migration MIGRATION_2_3 = new Migration(2, 3) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE note ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
     public static NotesDatabase getInstance(Context context) {
         if (INSTANCE == null) {
             INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                     NotesDatabase.class, "notes.db")
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build();
         }
         return INSTANCE;

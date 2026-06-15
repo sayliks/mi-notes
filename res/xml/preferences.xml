@@ -27,4 +27,13 @@
             android:title="@string/preferences_bg_random_appear_title"
             android:defaultValue="false" />
     </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_encryption_key"
+        android:title="@string/preferences_encryption_title">
+        <Preference
+            android:key="pref_key_encryption_manage"
+            android:title="@string/preferences_set_password"
+            android:summary="@string/preferences_encryption_summary" />
+    </PreferenceCategory>
 </PreferenceScreen>

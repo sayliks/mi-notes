@@ -167,6 +167,12 @@ public class Notes {
          * <P> Type : INTEGER (long) </P>
          */
         public static final String VERSION = "version";
+
+        /**
+         * Whether the note content is encrypted
+         * <P> Type : INTEGER (0 = normal, 1 = encrypted) </P>
+         */
+        public static final String ENCRYPTED = "encrypted";
     }
 
     public interface DataColumns {

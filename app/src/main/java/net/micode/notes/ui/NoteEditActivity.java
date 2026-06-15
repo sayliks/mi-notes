@@ -57,6 +57,7 @@ import net.micode.notes.data.Notes.TextNote;
 import net.micode.notes.model.WorkingNote;
 import net.micode.notes.model.WorkingNote.NoteSettingChangedListener;
 import net.micode.notes.tool.DataUtils;
+import net.micode.notes.tool.NoteEncryption;
 import net.micode.notes.tool.ResourceParser;
 import net.micode.notes.tool.ResourceParser.TextAppearanceResources;
 import net.micode.notes.ui.DateTimePickerDialog.OnDateTimeSetListener;
@@ -151,6 +152,7 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
 
     private String mUserQuery;
     private Pattern mPattern;
+    private boolean mIsDecrypted;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -220,6 +222,17 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
                     finish();
                     return false;
                 }
+                if (mWorkingNote.isEncrypted()) {
+                    if (!NotesPreferenceActivity.isEncryptionConfigured(this)) {
+                        Toast.makeText(this, R.string.dialog_password_required,
+                                Toast.LENGTH_SHORT).show();
+                        finish();
+                        return false;
+                    }
+                    showPasswordVerifyDialog();
+                } else {
+                    mIsDecrypted = true;
+                }
             }
             getWindow().setSoftInputMode(
                     WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
@@ -284,7 +297,10 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     private void initNoteScreen() {
         mNoteEditor.setTextAppearance(this, TextAppearanceResources
                 .getTexAppearanceResource(mFontSizeId));
-        if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
+        if (mWorkingNote.isEncrypted() && !mIsDecrypted) {
+            mNoteEditor.setText(getString(R.string.encrypted_placeholder));
+            mNoteEditor.setEnabled(false);
+        } else if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
             switchToListMode(mWorkingNote.getContent());
         } else {
             mNoteEditor.setText(getHighlightQueryResult(mWorkingNote.getContent(), mUserQuery));
@@ -668,6 +684,21 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             }
         });
 
+        // Encrypt/decrypt toggle
+        TextView encryptText = (TextView) contentView.findViewById(R.id.bottom_menu_encrypt_text);
+        if (mWorkingNote.isEncrypted()) {
+            encryptText.setText(R.string.menu_decrypt);
+        } else {
+            encryptText.setText(R.string.menu_encrypt);
+        }
+        contentView.findViewById(R.id.bottom_menu_encrypt).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                showEncryptToggleDialog();
+            }
+        });
+
         dialog.setContentView(contentView);
         dialog.show();
     }
@@ -679,6 +710,120 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     private String getCurrentNoteContent() {
         getWorkingText();
         return mWorkingNote.getContent();
+    }
+
+    private void showPasswordVerifyDialog() {
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.dialog_enter_password);
+        passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(passwordInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_enter_password)
+                .setView(container)
+                .setCancelable(false)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        char[] password = passwordInput.getText().toString().toCharArray();
+                        if (NotesPreferenceActivity.verifyPassword(
+                                NoteEditActivity.this, password)) {
+                            try {
+                                javax.crypto.SecretKey key = NotesPreferenceActivity.deriveKey(
+                                        NoteEditActivity.this, password);
+                                mWorkingNote.decryptContent(key);
+                                mIsDecrypted = true;
+                                mNoteEditor.setEnabled(true);
+                                initNoteScreen();
+                            } catch (Exception e) {
+                                Log.e(TAG, "Decryption failed", e);
+                                Toast.makeText(NoteEditActivity.this,
+                                        R.string.dialog_wrong_password,
+                                        Toast.LENGTH_SHORT).show();
+                                finish();
+                            }
+                        } else {
+                            Toast.makeText(NoteEditActivity.this,
+                                    R.string.dialog_wrong_password,
+                                    Toast.LENGTH_SHORT).show();
+                            finish();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                })
+                .show();
+    }
+
+    private void showEncryptToggleDialog() {
+        if (!NotesPreferenceActivity.isEncryptionConfigured(this)) {
+            Toast.makeText(this, R.string.dialog_password_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.dialog_enter_password);
+        passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(passwordInput);
+
+        final boolean willEncrypt = !mWorkingNote.isEncrypted();
+        int titleRes = willEncrypt ? R.string.menu_encrypt : R.string.menu_decrypt;
+
+        new AlertDialog.Builder(this)
+                .setTitle(titleRes)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        char[] password = passwordInput.getText().toString().toCharArray();
+                        if (!NotesPreferenceActivity.verifyPassword(
+                                NoteEditActivity.this, password)) {
+                            Toast.makeText(NoteEditActivity.this,
+                                    R.string.dialog_wrong_password,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        try {
+                            javax.crypto.SecretKey key = NotesPreferenceActivity.deriveKey(
+                                    NoteEditActivity.this, password);
+                            getWorkingText();
+                            if (willEncrypt) {
+                                mWorkingNote.setEncrypted(1);
+                                mWorkingNote.encryptContent(key);
+                                mIsDecrypted = false;
+                            } else {
+                                mWorkingNote.decryptContent(key);
+                                mWorkingNote.setEncrypted(0);
+                                mIsDecrypted = true;
+                                mNoteEditor.setEnabled(true);
+                            }
+                            saveNote();
+                            initNoteScreen();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Encryption toggle failed", e);
+                            Toast.makeText(NoteEditActivity.this,
+                                    R.string.dialog_wrong_password,
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void sendTo(Context context, String info) {

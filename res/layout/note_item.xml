@@ -75,4 +75,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|right"/>
+
+    <ImageView
+        android:id="@+id/iv_lock_icon"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_gravity="bottom|right"
+        android:src="@android:drawable/ic_lock_lock"
+        android:visibility="gone" />
 </FrameLayout>

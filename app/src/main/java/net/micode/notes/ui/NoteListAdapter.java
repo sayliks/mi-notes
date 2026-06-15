@@ -137,6 +137,7 @@ public class NoteListAdapter extends ListAdapter<NoteEntity, NoteListAdapter.Vie
 
     class ViewHolder extends RecyclerView.ViewHolder {
         ImageView alertIcon;
+        ImageView lockIcon;
         TextView title;
         TextView time;
         TextView callName;
@@ -145,6 +146,7 @@ public class NoteListAdapter extends ListAdapter<NoteEntity, NoteListAdapter.Vie
         ViewHolder(View itemView) {
             super(itemView);
             alertIcon = itemView.findViewById(R.id.iv_alert_icon);
+            lockIcon = itemView.findViewById(R.id.iv_lock_icon);
             title = itemView.findViewById(R.id.tv_title);
             time = itemView.findViewById(R.id.tv_time);
             callName = itemView.findViewById(R.id.tv_name);
@@ -202,7 +204,13 @@ public class NoteListAdapter extends ListAdapter<NoteEntity, NoteListAdapter.Vie
                             + itemView.getContext().getString(R.string.format_folder_files_count, note.notesCount));
                     alertIcon.setVisibility(View.GONE);
                 } else {
-                    title.setText(DataUtils.getFormattedSnippet(note.title != null ? note.title : ""));
+                    if (note.encrypted == 1) {
+                        title.setText(itemView.getContext().getString(R.string.encrypted_placeholder));
+                        lockIcon.setVisibility(View.VISIBLE);
+                    } else {
+                        title.setText(DataUtils.getFormattedSnippet(note.title != null ? note.title : ""));
+                        lockIcon.setVisibility(View.GONE);
+                    }
                     if (note.alertDate > 0) {
                         alertIcon.setImageResource(R.drawable.clock);
                         alertIcon.setVisibility(View.VISIBLE);

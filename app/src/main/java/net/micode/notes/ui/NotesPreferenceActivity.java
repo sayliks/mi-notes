@@ -54,6 +54,7 @@ import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.sync.webdav.WebDavSyncManager;
 import net.micode.notes.sync.webdav.WebDavSyncService;
+import net.micode.notes.tool.NoteEncryption;
 
 import java.lang.ref.WeakReference;
 
@@ -86,6 +87,10 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     private static final int LAST_SYNC_RESULT_FAILED = 2;
 
     public static final String PREFERENCE_SET_BG_COLOR_KEY = "pref_key_bg_random_appear";
+
+    public static final String PREFERENCE_ENCRYPTION_PASSWORD_HASH = "pref_key_encryption_password_hash";
+
+    public static final String PREFERENCE_ENCRYPTION_SALT = "pref_key_encryption_salt";
 
     private static final String PREFERENCE_SYNC_ACCOUNT_KEY = "pref_sync_account_key";
 
@@ -235,6 +240,7 @@ public class NotesPreferenceActivity extends AppCompatActivity {
     private void refreshUI() {
         loadAccountPreference();
         loadSyncButton();
+        refreshEncryptionPreference();
     }
 
     private void showWebDavSettingsDialog() {
@@ -472,6 +478,63 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         return !TextUtils.isEmpty(normalizeWebDavUrl(getWebDavUrl(context)));
     }
 
+    public static boolean isEncryptionConfigured(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        return !TextUtils.isEmpty(settings.getString(PREFERENCE_ENCRYPTION_PASSWORD_HASH, ""));
+    }
+
+    public static boolean verifyPassword(Context context, char[] password) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        String storedHash = settings.getString(PREFERENCE_ENCRYPTION_PASSWORD_HASH, "");
+        String saltHex = settings.getString(PREFERENCE_ENCRYPTION_SALT, "");
+        if (TextUtils.isEmpty(storedHash) || TextUtils.isEmpty(saltHex)) {
+            return false;
+        }
+        try {
+            byte[] salt = NoteEncryption.hexToBytes(saltHex);
+            String hash = NoteEncryption.hashPassword(password, salt);
+            return storedHash.equals(hash);
+        } catch (Exception e) {
+            Log.e(TAG, "Password verification failed", e);
+            return false;
+        }
+    }
+
+    public static void setPassword(Context context, char[] password) {
+        try {
+            byte[] salt = NoteEncryption.generateSalt();
+            String hash = NoteEncryption.hashPassword(password, salt);
+            SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                    Context.MODE_PRIVATE);
+            settings.edit()
+                    .putString(PREFERENCE_ENCRYPTION_PASSWORD_HASH, hash)
+                    .putString(PREFERENCE_ENCRYPTION_SALT, NoteEncryption.bytesToHex(salt))
+                    .apply();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set password", e);
+        }
+    }
+
+    public static void clearPassword(Context context) {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        settings.edit()
+                .remove(PREFERENCE_ENCRYPTION_PASSWORD_HASH)
+                .remove(PREFERENCE_ENCRYPTION_SALT)
+                .apply();
+    }
+
+    public static javax.crypto.SecretKey deriveKey(Context context, char[] password)
+            throws Exception {
+        SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
+        String saltHex = settings.getString(PREFERENCE_ENCRYPTION_SALT, "");
+        byte[] salt = NoteEncryption.hexToBytes(saltHex);
+        return NoteEncryption.generateKey(password, salt);
+    }
+
     private void setWebDavConfig(String url, String userName, String password) {
         SharedPreferences settings = getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
         saveWebDavConfig(settings, url, userName, password);
@@ -571,6 +634,180 @@ public class NotesPreferenceActivity extends AppCompatActivity {
         SharedPreferences settings = context.getSharedPreferences(PREFERENCE_NAME,
                 Context.MODE_PRIVATE);
         return settings.getLong(PREFERENCE_LAST_SYNC_TIME, 0);
+    }
+
+    private void showSetPasswordDialog() {
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.dialog_set_password);
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        final EditText confirmInput = new EditText(this);
+        confirmInput.setSingleLine(true);
+        confirmInput.setHint(R.string.dialog_confirm_password);
+        confirmInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(passwordInput);
+        container.addView(confirmInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_set_password)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        String password = passwordInput.getText().toString();
+                        String confirm = confirmInput.getText().toString();
+                        if (password.isEmpty()) {
+                            return;
+                        }
+                        if (!password.equals(confirm)) {
+                            Toast.makeText(NotesPreferenceActivity.this,
+                                    R.string.dialog_password_mismatch,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        setPassword(NotesPreferenceActivity.this, password.toCharArray());
+                        Toast.makeText(NotesPreferenceActivity.this,
+                                R.string.preferences_password_set,
+                                Toast.LENGTH_SHORT).show();
+                        refreshEncryptionPreference();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showChangePasswordDialog() {
+        final EditText oldPasswordInput = new EditText(this);
+        oldPasswordInput.setSingleLine(true);
+        oldPasswordInput.setHint(R.string.dialog_enter_password);
+        oldPasswordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        final EditText newPasswordInput = new EditText(this);
+        newPasswordInput.setSingleLine(true);
+        newPasswordInput.setHint(R.string.dialog_new_password);
+        newPasswordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        final EditText confirmInput = new EditText(this);
+        confirmInput.setSingleLine(true);
+        confirmInput.setHint(R.string.dialog_confirm_password);
+        confirmInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(oldPasswordInput);
+        container.addView(newPasswordInput);
+        container.addView(confirmInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.preferences_change_password)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        String oldPassword = oldPasswordInput.getText().toString();
+                        String newPassword = newPasswordInput.getText().toString();
+                        String confirm = confirmInput.getText().toString();
+                        if (!verifyPassword(NotesPreferenceActivity.this,
+                                oldPassword.toCharArray())) {
+                            Toast.makeText(NotesPreferenceActivity.this,
+                                    R.string.dialog_wrong_password,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (newPassword.isEmpty()) {
+                            return;
+                        }
+                        if (!newPassword.equals(confirm)) {
+                            Toast.makeText(NotesPreferenceActivity.this,
+                                    R.string.dialog_password_mismatch,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        setPassword(NotesPreferenceActivity.this, newPassword.toCharArray());
+                        Toast.makeText(NotesPreferenceActivity.this,
+                                R.string.preferences_password_set,
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showClearPasswordDialog() {
+        final EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setHint(R.string.dialog_enter_password);
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(passwordInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.preferences_clear_password)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        String password = passwordInput.getText().toString();
+                        if (!verifyPassword(NotesPreferenceActivity.this,
+                                password.toCharArray())) {
+                            Toast.makeText(NotesPreferenceActivity.this,
+                                    R.string.dialog_wrong_password,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        clearPassword(NotesPreferenceActivity.this);
+                        Toast.makeText(NotesPreferenceActivity.this,
+                                R.string.preferences_password_cleared,
+                                Toast.LENGTH_SHORT).show();
+                        refreshEncryptionPreference();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void refreshEncryptionPreference() {
+        PreferenceFragmentCompat fragment = (PreferenceFragmentCompat)
+                getSupportFragmentManager().findFragmentById(R.id.prefs_container);
+        if (fragment != null) {
+            Preference pref = fragment.findPreference("pref_key_encryption_manage");
+            if (pref != null) {
+                if (isEncryptionConfigured(this)) {
+                    pref.setTitle(R.string.preferences_change_password);
+                    pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                        @Override
+                        public boolean onPreferenceClick(Preference preference) {
+                            showChangePasswordDialog();
+                            return true;
+                        }
+                    });
+                } else {
+                    pref.setTitle(R.string.preferences_set_password);
+                    pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                        @Override
+                        public boolean onPreferenceClick(Preference preference) {
+                            showSetPasswordDialog();
+                            return true;
+                        }
+                    });
+                }
+            }
+        }
     }
 
     @Override

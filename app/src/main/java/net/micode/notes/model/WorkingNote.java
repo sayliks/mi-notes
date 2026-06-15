@@ -23,13 +23,17 @@ import android.database.Cursor;
 import android.text.TextUtils;
 import android.util.Log;
 
+import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.CallNote;
 import net.micode.notes.data.Notes.DataColumns;
 import net.micode.notes.data.Notes.DataConstants;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.data.Notes.TextNote;
+import net.micode.notes.tool.NoteEncryption;
 import net.micode.notes.tool.ResourceParser.NoteBgResources;
+
+import javax.crypto.SecretKey;
 
 
 public class WorkingNote {
@@ -60,6 +64,11 @@ public class WorkingNote {
 
     private boolean mIsDeleted;
 
+    // Encryption state
+    private int mEncrypted;
+
+    private byte[] mIv;
+
     private NoteSettingChangedListener mNoteSettingStatusListener;
 
     public static final String[] DATA_PROJECTION = new String[] {
@@ -78,7 +87,8 @@ public class WorkingNote {
             NoteColumns.BG_COLOR_ID,
             NoteColumns.WIDGET_ID,
             NoteColumns.WIDGET_TYPE,
-            NoteColumns.MODIFIED_DATE
+            NoteColumns.MODIFIED_DATE,
+            NoteColumns.ENCRYPTED
     };
 
     private static final int DATA_ID_COLUMN = 0;
@@ -100,6 +110,10 @@ public class WorkingNote {
     private static final int NOTE_WIDGET_TYPE_COLUMN = 4;
 
     private static final int NOTE_MODIFIED_DATE_COLUMN = 5;
+
+    private static final int NOTE_ENCRYPTED_COLUMN = 6;
+
+    private static final int DATA_DATA4_COLUMN = 6;
 
     // New note construct
     private WorkingNote(Context context, long folderId) {
@@ -137,6 +151,7 @@ public class WorkingNote {
                 mWidgetType = cursor.getInt(NOTE_WIDGET_TYPE_COLUMN);
                 mAlertDate = cursor.getLong(NOTE_ALERTED_DATE_COLUMN);
                 mModifiedDate = cursor.getLong(NOTE_MODIFIED_DATE_COLUMN);
+                mEncrypted = cursor.getInt(NOTE_ENCRYPTED_COLUMN);
             }
             cursor.close();
         } else {
@@ -160,6 +175,10 @@ public class WorkingNote {
                         mContent = cursor.getString(DATA_CONTENT_COLUMN);
                         mMode = cursor.getInt(DATA_MODE_COLUMN);
                         mNote.setTextDataId(cursor.getLong(DATA_ID_COLUMN));
+                        String ivBase64 = cursor.getString(DATA_DATA4_COLUMN);
+                        if (ivBase64 != null && !ivBase64.isEmpty()) {
+                            mIv = NoteEncryption.decodeBase64(ivBase64);
+                        }
                     } else if (DataConstants.CALL_NOTE.equals(type)) {
                         mNote.setCallDataId(cursor.getLong(DATA_ID_COLUMN));
                     } else {
@@ -340,6 +359,58 @@ public class WorkingNote {
 
     public int getWidgetType() {
         return mWidgetType;
+    }
+
+    public boolean isEncrypted() {
+        return mEncrypted == 1;
+    }
+
+    public void setEncrypted(int encrypted) {
+        if (mEncrypted != encrypted) {
+            mEncrypted = encrypted;
+            mNote.setNoteValue(NoteColumns.ENCRYPTED, String.valueOf(mEncrypted));
+        }
+    }
+
+    public byte[] getIv() {
+        return mIv;
+    }
+
+    /**
+     * Encrypts the current plaintext content and stores the ciphertext.
+     * Also sets the snippet to a placeholder and stores the IV.
+     *
+     * @param key the AES key derived from the user's password
+     */
+    public void encryptContent(SecretKey key) throws Exception {
+        if (mContent == null || mContent.isEmpty()) {
+            return;
+        }
+        NoteEncryption.EncryptedData encrypted = NoteEncryption.encrypt(mContent, key);
+        mNote.setTextData(DataColumns.CONTENT, encrypted.ciphertext);
+        mNote.setTextData(DataColumns.DATA4, NoteEncryption.encodeBase64(encrypted.iv));
+        mIv = encrypted.iv;
+        // Set snippet to placeholder so the DB trigger doesn't store ciphertext
+        mNote.setNoteValue(NoteColumns.SNIPPET,
+                mContext.getString(R.string.encrypted_placeholder));
+    }
+
+    /**
+     * Decrypts the current ciphertext content and restores the plaintext.
+     *
+     * @param key the AES key derived from the user's password
+     * @throws Exception if the password is wrong or data is corrupted
+     */
+    public void decryptContent(SecretKey key) throws Exception {
+        if (mContent == null || mContent.isEmpty() || mIv == null) {
+            return;
+        }
+        String plaintext = NoteEncryption.decrypt(mContent, mIv, key);
+        mContent = plaintext;
+        mNote.setTextData(DataColumns.CONTENT, mContent);
+        // Clear IV since content is now plaintext
+        mNote.setTextData(DataColumns.DATA4, "");
+        mIv = null;
     }
 
     public interface NoteSettingChangedListener {

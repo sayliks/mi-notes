@@ -53,4 +53,7 @@ public class NoteEntity {
 
     @ColumnInfo(name = "notes_count")
     public int notesCount;         // 文件夹内便签数
+
+    @ColumnInfo(name = "encrypted", defaultValue = "0")
+    public int encrypted;          // 0=普通, 1=已加密
 }

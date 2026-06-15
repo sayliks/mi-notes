@@ -68,7 +68,8 @@ public class NotesRepository {
             NoteColumns.NOTES_COUNT,
             NoteColumns.SNIPPET,
             NoteColumns.TYPE,
-            NoteColumns.VERSION
+            NoteColumns.VERSION,
+            NoteColumns.ENCRYPTED
     };
 
     private static final int NOTE_ID = 0;
@@ -81,6 +82,7 @@ public class NotesRepository {
     private static final int NOTE_SNIPPET = 7;
     private static final int NOTE_TYPE = 8;
     private static final int NOTE_VERSION = 9;
+    private static final int NOTE_ENCRYPTED = 10;
 
     private static final String[] DATA_PROJECTION = new String[] {
             DataColumns.NOTE_ID,
@@ -363,6 +365,7 @@ public class NotesRepository {
         note.title = cursor.getString(NOTE_SNIPPET);
         note.type = cursor.getInt(NOTE_TYPE);
         note.version = cursor.getInt(NOTE_VERSION);
+        note.encrypted = cursor.getInt(NOTE_ENCRYPTED);
         note.contentType = NoteEntity.CONTENT_TYPE_TEXT;
         note.content = textData == null ? note.title : textData.content;
         note.isChecklist = textData != null && textData.mode == TextNote.MODE_CHECK_LIST;
