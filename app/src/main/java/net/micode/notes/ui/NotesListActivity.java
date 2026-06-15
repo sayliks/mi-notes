@@ -108,7 +108,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
             setAppInfoFromRawRes();
         } catch (Exception e) {
             Log.e(TAG, "onCreate failed", e);
-            Toast.makeText(this, "Crash: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.error_crash_prefix, e.getMessage()), Toast.LENGTH_LONG).show();
             throw e;
         }
     }
@@ -535,6 +535,11 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                 super.onBackPressed();
                 break;
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        return true;
     }
 
     @Override

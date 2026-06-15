@@ -24,6 +24,9 @@
     <string name="widget_under_visit_mode">Privacy mode，can not see note content</string>
     <string name="notelist_string_info">...</string>
     <string name="notelist_menu_new">Add note</string>
+    <string name="new_note_title">New note</string>
+    <string name="new_text_note">Text note</string>
+    <string name="new_checklist">Checklist</string>
     <string name="delete_remind_time_message">Delete reminder successfully</string>
     <string name="set_remind_time_message">Set reminder</string>
     <string name="note_alert_expired">Expired</string>
@@ -164,6 +167,7 @@
     <string name="search">Notes</string>
     <string name="datetime_dialog_ok">set</string>
     <string name="datetime_dialog_cancel">cancel</string>
+    <string name="error_crash_prefix">Crash: %1$s</string>
     <plurals name="search_results_title">
          <item quantity="one"><xliff:g id="number" example="1">%1$s</xliff:g> result for \"<xliff:g id="search" example="???">%2$s</xliff:g>\"</item>
         <!-- Case of 0 or 2 or more results. -->

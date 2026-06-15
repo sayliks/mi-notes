@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="新建便签"
+        android:text="@string/new_note_title"
         android:textSize="18sp"
         android:textStyle="bold"
         android:paddingBottom="12dp" />
@@ -33,7 +33,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="文本便签"
+            android:text="@string/new_text_note"
             android:textSize="16sp" />
     </LinearLayout>
 
@@ -57,7 +57,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="清单"
+            android:text="@string/new_checklist"
             android:textSize="16sp" />
     </LinearLayout>
 </LinearLayout>

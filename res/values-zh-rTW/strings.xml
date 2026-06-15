@@ -24,6 +24,9 @@
     <string name="widget_under_visit_mode">訪客模式下，便籤內容不可見</string>
     <string name="notelist_string_info">...</string>
     <string name="notelist_menu_new">新建便簽</string>
+    <string name="new_note_title">新建便簽</string>
+    <string name="new_text_note">文本便簽</string>
+    <string name="new_checklist">清單</string>
     <string name="delete_remind_time_message">成功刪除提醒</string>
     <string name="set_remind_time_message">創建提醒</string>
     <string name="note_alert_expired">已過期</string>
@@ -159,6 +162,7 @@
     <string name="search">便籤</string>
     <string name="datetime_dialog_ok">設置</string>
     <string name="datetime_dialog_cancel">取消</string>
+    <string name="error_crash_prefix">崩潰：%1$s</string>
     <plurals name="search_results_title">
         <item quantity="other"><xliff:g id="NUMBER">%1$s</xliff:g> 條符合”<xliff:g id="SEARCH">%2$s</xliff:g>“的搜尋結果</item>
     </plurals>

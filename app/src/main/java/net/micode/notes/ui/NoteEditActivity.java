@@ -19,6 +19,7 @@ package net.micode.notes.ui;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import android.app.SearchManager;
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
@@ -80,6 +81,10 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         public TextView tvAlertDate;
 
         public View ibSetBgColor;
+
+        public View btnSetAlert;
+
+        public View btnMoreMenu;
     }
 
     private static final Map<Integer, Integer> sBgSelectorBtnsMap = new HashMap<Integer, Integer>();
@@ -314,9 +319,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             }
             mNoteHeaderHolder.tvAlertDate.setVisibility(View.VISIBLE);
             mNoteHeaderHolder.ivAlertIcon.setVisibility(View.VISIBLE);
+            ((ImageView) mNoteHeaderHolder.btnSetAlert).setImageAlpha(255);
         } else {
             mNoteHeaderHolder.tvAlertDate.setVisibility(View.GONE);
             mNoteHeaderHolder.ivAlertIcon.setVisibility(View.GONE);
+            ((ImageView) mNoteHeaderHolder.btnSetAlert).setImageAlpha(100);
         };
     }
 
@@ -384,6 +391,10 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         mNoteHeaderHolder.tvAlertDate = (TextView) findViewById(R.id.tv_alert_date);
         mNoteHeaderHolder.ibSetBgColor = findViewById(R.id.btn_set_bg_color);
         mNoteHeaderHolder.ibSetBgColor.setOnClickListener(this);
+        mNoteHeaderHolder.btnSetAlert = findViewById(R.id.btn_set_alert);
+        mNoteHeaderHolder.btnSetAlert.setOnClickListener(this);
+        mNoteHeaderHolder.btnMoreMenu = findViewById(R.id.btn_more_menu);
+        mNoteHeaderHolder.btnMoreMenu.setOnClickListener(this);
         mNoteEditor = (EditText) findViewById(R.id.note_edit_view);
         mNoteEditorPanel = findViewById(R.id.sv_note_edit);
         mNoteBgColorSelector = findViewById(R.id.note_bg_color_selector);
@@ -444,6 +455,14 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             mNoteBgColorSelector.setVisibility(View.VISIBLE);
             findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
                     View.VISIBLE);
+        } else if (id == R.id.btn_set_alert) {
+            if (mWorkingNote.hasClockAlert()) {
+                mWorkingNote.setAlertDate(0, false);
+            } else {
+                setReminder();
+            }
+        } else if (id == R.id.btn_more_menu) {
+            showBottomSheetMenu();
         } else if (sBgSelectorBtnsMap.containsKey(id)) {
             findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
                     View.GONE);
@@ -491,6 +510,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
                 View.VISIBLE);
         mNoteEditorPanel.setBackgroundResource(mWorkingNote.getBgColorResId());
         mHeadViewPanel.setBackgroundResource(mWorkingNote.getTitleBgResId());
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        return true;
     }
 
     @Override
@@ -567,6 +591,85 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
             }
         });
         d.show();
+    }
+
+    private void showBottomSheetMenu() {
+        clearSettingState();
+        final BottomSheetDialog dialog = new BottomSheetDialog(this);
+        View contentView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_note_menu, null);
+
+        // Update checklist mode text
+        TextView listModeText = (TextView) contentView.findViewById(R.id.bottom_menu_list_mode_text);
+        if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
+            listModeText.setText(R.string.menu_normal_mode);
+        } else {
+            listModeText.setText(R.string.menu_list_mode);
+        }
+
+        contentView.findViewById(R.id.bottom_menu_new_note).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                createNewNote();
+            }
+        });
+
+        contentView.findViewById(R.id.bottom_menu_delete).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                AlertDialog.Builder builder = new AlertDialog.Builder(NoteEditActivity.this);
+                builder.setTitle(getString(R.string.alert_title_delete));
+                builder.setIcon(android.R.drawable.ic_dialog_alert);
+                builder.setMessage(getString(R.string.alert_message_delete_note));
+                builder.setPositiveButton(android.R.string.ok,
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                deleteCurrentNote();
+                                finish();
+                            }
+                        });
+                builder.setNegativeButton(android.R.string.cancel, null);
+                builder.show();
+            }
+        });
+
+        contentView.findViewById(R.id.bottom_menu_font_size).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                mFontSizeSelector.setVisibility(View.VISIBLE);
+                findViewById(sFontSelectorSelectionMap.get(mFontSizeId)).setVisibility(View.VISIBLE);
+            }
+        });
+
+        contentView.findViewById(R.id.bottom_menu_list_mode).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                mWorkingNote.setCheckListMode(mWorkingNote.getCheckListMode() == 0 ?
+                        TextNote.MODE_CHECK_LIST : 0);
+            }
+        });
+
+        contentView.findViewById(R.id.bottom_menu_share).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                sendTo(NoteEditActivity.this, getCurrentNoteContent());
+            }
+        });
+
+        contentView.findViewById(R.id.bottom_menu_send_to_desktop).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                sendToDesktop();
+            }
+        });
+
+        dialog.setContentView(contentView);
+        dialog.show();
     }
 
     /**
