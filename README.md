@@ -42,10 +42,12 @@
 
 ## 关键文档
 
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)：现代化路线图和迁移原则。
-- [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md)：Room / Provider / WebDAV 迁移验证清单。
-- [ALARM_WIDGET_VERIFICATION.md](ALARM_WIDGET_VERIFICATION.md)：闹钟提醒和桌面小组件的代码边界与安全测试步骤。
-- [AGENTS.md](AGENTS.md)：面向代码代理的项目约束。
+- [CLAUDE.md](CLAUDE.md)：构建命令、架构概览和开发指南。
+- [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)：现代化路线图和迁移原则。
+- [docs/MIGRATION_VERIFICATION.md](docs/MIGRATION_VERIFICATION.md)：Room / Provider / WebDAV 迁移验证清单。
+- [docs/ALARM_WIDGET_VERIFICATION.md](docs/ALARM_WIDGET_VERIFICATION.md)：闹钟提醒和桌面小组件的代码边界与安全测试步骤。
+- [docs/SNAPSHOT_SCHEMA.md](docs/SNAPSHOT_SCHEMA.md)：WebDAV 同步快照 JSON 格式和向后兼容策略。
+- [docs/AGENTS.md](docs/AGENTS.md)：面向代码代理的项目约束和编码约定。
 
 ## 开源协议
 

@@ -102,7 +102,7 @@ WebDAV 当前仍基于 provider 导入 / 导出快照。Room 迁移前不要把�
 - 校准设置页文案，明确文件夹 URL、直接文件 URL、快照文件和备份文件命名规则。
 - 补充典型服务端手动验证矩阵：坚果云、Nextcloud、Apache mod_dav、Nginx WebDAV。
 - 覆盖网络失败、认证失败、路径错误、损坏快照、备份失败和上传失败。
-- 固化同步快照 schema，记录版本字段与向后兼容策略。
+- ~~固化同步快照 schema，记录版本字段与向后兼容策略。~~ 已完成，见 [SNAPSHOT_SCHEMA.md](SNAPSHOT_SCHEMA.md)。
 
 验收标准：
 
